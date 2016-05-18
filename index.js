@@ -1,13 +1,22 @@
 import Cycle from '@cycle/core'
-import {makeDOMDriver, div} from '@cycle/dom'
+import {makeDOMDriver, div, button} from '@cycle/dom'
 import {Observable} from 'rx'
 
-function main(sources) {
+function main({DOM}) {
+  const click$ = DOM
+    .select('.add')
+    .events('click')
+    .map((event) => 1);
+
+  const total$ = click$
+    .startWith(0)
+    .scan((total, change) => total + change)
+
   return {
-    DOM: Observable.just(
+    DOM: total$.map(total =>
       div([
-        div('.hello', {style: {color: 'red'}}, 'Hello Nurse'),
-        div('The world is your oysters')
+        button('.add', {style: {color: 'red'}}, 'Add'),
+        div(`count: ${total}`)
       ])
     )
   }
