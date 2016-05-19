@@ -1,35 +1,52 @@
 import Cycle from '@cycle/core'
 import {makeDOMDriver, div, button} from '@cycle/dom'
 import {Observable} from 'rx'
+import _ from 'lodash'
+
+function makeBoard({rows, columns}) {
+  return (
+    _.range(0, rows).map((row, rowIndex) =>
+      _.range(0, columns).map((column, columnIndex) => Tile({
+        row: rowIndex,
+        column: columnIndex
+      }))
+    )
+  )
+}
+
+function Tile({row, column}) {
+  return {row, column, plant: null}
+}
+
+function renderTile(tile) {
+  return (
+    div(`.tile ${tile.plant ? '.plant' : '' }`)
+  )
+}
+
+function renderRow(row) {
+  return (
+    div('.row', row.map(renderTile))
+  )
+}
+
+function view({board}) {
+  return (
+    div('.board', board.map(renderRow))
+  )
+}
 
 function main({DOM}) {
-  const add$ = DOM
-    .select('.add')
-    .events('click')
-    .map((event) => 1);
+  const initialState = {
+    board: makeBoard({rows: 20, columns: 20})
+  }
 
-  const subtract$ = DOM
-    .select('.subtract')
-    .events('click')
-    .map((event) => -1);
+  initialState.board[0][4].plant = true
 
-  const change$ = Observable.merge(
-    add$,
-    subtract$
-  )
-
-  const total$ = change$
-    .startWith(0)
-    .scan((total, change) => total + change)
+  const state$ = Observable.just(initialState)
 
   return {
-    DOM: total$.map(total =>
-      div([
-        button('.add', {style: {color: 'green'}}, '+'),
-        button('.subtract', {style: {color: 'red'}}, '-'),
-        div(`count: ${total}`)
-      ])
-    )
+    DOM: state$.map(view)
   }
 }
 
