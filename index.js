@@ -3,6 +3,9 @@ import {makeDOMDriver, div, button} from '@cycle/dom'
 import {Observable} from 'rx'
 import _ from 'lodash'
 import {makeKeysDriver} from 'cycle-keys';
+import {makeAnimationDriver} from 'cycle-animation-driver';
+
+const FRAMERATE = 1000 / 60
 
 function Board({rows, columns}) {
   return (
@@ -17,6 +20,7 @@ function Board({rows, columns}) {
 
 function Gardener({position}) {
   return {
+    speed: 2,
     position
   }
 }
@@ -54,30 +58,35 @@ function view({board, gardener}) {
   )
 }
 
-function update(state) {
-  state.gardener.position.x += 10
+function update(delta, dIsDown) {
+  return function(state) {
+    if (dIsDown) {
+      state.gardener.position.x += state.gardener.speed * delta
+    }
 
-  return state
+    return state
+  }
 }
 
-//capture a keys stream
-  //log some output when you press a key
-  //
-
-
-function main({DOM, Keys}) {
+function main({DOM, Keys, Animation}) {
   const initialState = {
     board: Board({rows: 20, columns: 20}),
     gardener: Gardener({position: {x: 200, y: 150}})
   }
 
-  const d$ = Keys.press('d')
+  const dDown$ = Keys.down('D')
+    .map(event => true)
 
-  const moveGardener$
+  const dUp$ = Keys.up('D')
+    .map(event => false)
 
-  const update$ = Observable
-    .interval(100)
-    .map(() => update)
+  const d$ = Observable.merge(
+    dDown$,
+    dUp$
+  )
+
+  const update$ = Animation.pluck('delta')
+    .withLatestFrom(d$, (delta, dIsDown) => update(delta/FRAMERATE, dIsDown))
 
   initialState.board[0][4].plant = true
 
@@ -92,7 +101,8 @@ function main({DOM, Keys}) {
 
 const drivers = {
   DOM: makeDOMDriver('.app'),
-  Keys: makeKeysDriver()
+  Keys: makeKeysDriver(),
+  Animation: makeAnimationDriver()
 }
 
 Cycle.run(main, drivers)
