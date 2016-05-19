@@ -40,22 +40,24 @@ function Tile({row, column}) {
   return {row, column, plant: null}
 }
 
-function renderTile(tile) {
+function renderTile(tile, tileAtGardenerPosition) {
   return (
-    div(`.tile ${tile.plant ? '.plant' : '' }`)
+    div(`.tile ${tile.plant ? '.plant' : '' } ${tileAtGardenerPosition ? '.outline' : '' }`)
   )
 }
 
-function renderRow(row) {
+function renderRow(row, tileAtGardenerPosition) {
   return (
-    div('.row', row.map(renderTile))
+    div('.row', row.map(tile => renderTile(tile, tile === tileAtGardenerPosition)))
   )
 }
 
 function view({board, gardener}) {
+  const tileAtGardenerPosition = tileAtPosition(board, gardener.position)
+
   return (
     div('.game', [
-      div('.board', board.map(renderRow)),
+      div('.board', board.map(row => renderRow(row, tileAtGardenerPosition))),
       renderGardener(gardener)
     ])
   )
@@ -139,8 +141,6 @@ function main({DOM, Keys, Animation}) {
 
   const update$ = Animation.pluck('delta')
     .withLatestFrom(keys$, (delta, keys) => update(delta/FRAMERATE, keys))
-
-  initialState.board[0][4].plant = true
 
   const action$ = Observable.merge(
     update$,
