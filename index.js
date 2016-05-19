@@ -208,7 +208,7 @@ function numberOfLiveNeighbors(board, tile) {
 
   return actualNeighborPositions
     .map(neighbor => board[neighbor.row][neighbor.column])
-    .filter(neighbor => neighbor.plant && neighbor.age >= PLANT_MATURITY_AGE)
+    .filter(neighbor => neighbor.plant)
     .length
 }
 
