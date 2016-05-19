@@ -5,10 +5,13 @@ import _ from 'lodash'
 import {makeKeysDriver} from 'cycle-keys'
 import {makeAnimationDriver} from 'cycle-animation-driver'
 import combineLatestObj from 'rx-combine-latest-obj'
+import uuid from 'node-uuid'
 
 const FRAMERATE = 1000 / 60
 
 const BOARDSIZE = 30
+
+const PLANT_MATURITY_AGE = 3000 / FRAMERATE // msec
 
 function Board({rows, columns}) {
   return (
@@ -38,13 +41,23 @@ function renderGardener({position}) {
   )
 }
 
-function Tile({row, column, plant = false}) {
-  return {row, column, plant}
+function Tile({row, column, plant = false, age = 0, id = uuid.v4()}) {
+  return {row, column, plant, age, id}
 }
 
 function renderTile(tile, tileAtGardenerPosition) {
+  const classes = `.tile ${tile.plant ? '.plant' : '' } ${tileAtGardenerPosition ? '.outline' : '' }`
+
+  const style = {}
+
+  if (tile.plant && tile.age < PLANT_MATURITY_AGE) {
+    const borderThickness = 14 - (14 * tile.age / PLANT_MATURITY_AGE);
+
+    style.border = `${borderThickness}px solid black`
+  }
+
   return (
-    div(`.tile ${tile.plant ? '.plant' : '' } ${tileAtGardenerPosition ? '.outline' : '' }`)
+    div(classes, {key: tile.id, style})
   )
 }
 
@@ -103,36 +116,55 @@ function updateGardener(gardener, delta, keysDown) {
   }
 }
 
+function updateBoard(board, delta) {
+  return board.map(row => 
+    row.map(tile => {
+      if (tile.plant) {
+        tile.age += delta
+      }
+
+      return tile;
+    })
+  )
+}
+
 function update(delta, keysDown) {
   return function(state) {
     return {
       ...state,
+
+      board: updateBoard(state.board, delta),
 
       gardener: updateGardener(state.gardener, delta, keysDown)
     }
   }
 }
 
-function updateBoard(state) {
+function pulse(state) {
   const newBoard = state.board.map(row => 
     row.map(tile => {
       const liveNeighbors = numberOfLiveNeighbors(state.board, tile)
 
+
       if (!tile.plant) {
         if (liveNeighbors === 3) {
           console.log(liveNeighbors)
-          return Tile({...tile, plant: true})
+          return Tile({...tile, plant: true, age: PLANT_MATURITY_AGE})
         } else {
           return tile
         }
       }
 
+      if (tile.age < PLANT_MATURITY_AGE) {
+        return tile;
+      }
+
       if (liveNeighbors < 2) {
-        return Tile({...tile, plant: false})
+        return Tile({...tile, plant: false, age: 0})
       } else if (liveNeighbors <= 3) {
         return tile
       } else if (liveNeighbors > 3) {
-        return Tile({...tile, plant: false})
+        return Tile({...tile, plant: false, age: 0})
       } 
     })
   )
@@ -176,7 +208,7 @@ function numberOfLiveNeighbors(board, tile) {
 
   return actualNeighborPositions
     .map(neighbor => board[neighbor.row][neighbor.column])
-    .filter(neighbor => neighbor.plant)
+    .filter(neighbor => neighbor.plant && neighbor.age >= PLANT_MATURITY_AGE)
     .length
 }
 
@@ -191,6 +223,7 @@ function plant(state) {
   const tile = tileAtPosition(state.board, state.gardener.position)
 
   tile.plant = !tile.plant
+  tile.age = 0
 
   return state
 }
@@ -223,13 +256,13 @@ function main({DOM, Keys, Animation}) {
   const update$ = Animation.pluck('delta')
     .withLatestFrom(keys$, (delta, keys) => update(delta/FRAMERATE, keys))
 
-  const updateBoard$ = Observable.interval(1000)
-    .map(event => updateBoard)
+  const pulse$ = Observable.interval(1500)
+    .map(event => pulse)
 
   const action$ = Observable.merge(
     update$,
     plant$,
-    updateBoard$
+    pulse$
   )
 
   const initialState = {
