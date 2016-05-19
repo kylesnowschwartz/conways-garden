@@ -92,6 +92,21 @@ function update(delta, keysDown) {
   }
 }
 
+function tileAtPosition(board, position) {
+  let row = Math.round(position.y / 30)
+  let column = Math.round(position.x / 30)
+
+  return board[row][column]
+}
+
+function plant(state) {
+  const tile = tileAtPosition(state.board, state.gardener.position)
+
+  tile.plant = !tile.plant
+
+  return state
+}
+
 function main({DOM, Keys, Animation}) {
   const initialState = {
     board: Board({rows: 20, columns: 20}),
@@ -117,14 +132,22 @@ function main({DOM, Keys, Animation}) {
     S$: isDown('S'),
     D$: isDown('D')
   })
-
+    //if spacebar is pressed, change underlying div to have a plant
+  const plant$ = Keys.down('space')
+    .do(event => event.preventDefault())
+    .map(event => plant)
 
   const update$ = Animation.pluck('delta')
     .withLatestFrom(keys$, (delta, keys) => update(delta/FRAMERATE, keys))
 
   initialState.board[0][4].plant = true
 
-  const state$ = update$
+  const action$ = Observable.merge(
+    update$,
+    plant$
+  )
+
+  const state$ = action$
     .startWith(initialState)
     .scan((state, action) => action(state))
 

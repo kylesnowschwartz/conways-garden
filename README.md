@@ -3,9 +3,9 @@
 Todo
 
 - [x] make a grid
-- [ ] create a gardener (who can move)
-- [ ] the gardener can plant a plant
-- [ ] the gardener can remove a plant
+- [x] create a gardener (who can move)
+- [x] the gardener can plant a plant
+- [x] the gardener can remove a plant
 - [ ] a plant remains dormant for a time
 - [ ] plants then follow conway rules
 - [ ] make a world pulse, each pulse iterates conway
