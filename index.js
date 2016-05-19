@@ -2,8 +2,9 @@ import Cycle from '@cycle/core'
 import {makeDOMDriver, div, button} from '@cycle/dom'
 import {Observable} from 'rx'
 import _ from 'lodash'
-import {makeKeysDriver} from 'cycle-keys';
-import {makeAnimationDriver} from 'cycle-animation-driver';
+import {makeKeysDriver} from 'cycle-keys'
+import {makeAnimationDriver} from 'cycle-animation-driver'
+import combineLatestObj from 'rx-combine-latest-obj'
 
 const FRAMERATE = 1000 / 60
 
@@ -20,7 +21,9 @@ function Board({rows, columns}) {
 
 function Gardener({position}) {
   return {
-    speed: 2,
+    velocity: {x:0, y:0},
+    acceleration: 0.2,
+    friction: .94,
     position
   }
 }
@@ -58,11 +61,32 @@ function view({board, gardener}) {
   )
 }
 
-function update(delta, dIsDown) {
+function update(delta, keysDown) {
   return function(state) {
-    if (dIsDown) {
-      state.gardener.position.x += state.gardener.speed * delta
+    const gardener = state.gardener
+    const acceleration = state.gardener.acceleration * delta 
+
+    if (keysDown.W) {
+      gardener.velocity.y -= acceleration
     }
+
+    if (keysDown.S) {
+      gardener.velocity.y += acceleration
+    }
+
+    if (keysDown.A) {
+      gardener.velocity.x -= acceleration
+    }
+
+    if (keysDown.D) {
+      gardener.velocity.x += acceleration
+    }
+
+    gardener.position.x += gardener.velocity.x * delta
+    gardener.position.y += gardener.velocity.y * delta
+
+    gardener.velocity.x *= gardener.friction
+    gardener.velocity.y *= gardener.friction
 
     return state
   }
@@ -74,19 +98,29 @@ function main({DOM, Keys, Animation}) {
     gardener: Gardener({position: {x: 200, y: 150}})
   }
 
-  const dDown$ = Keys.down('D')
-    .map(event => true)
+  function isDown(key) {
+    const down$ = Keys.down(key)
+      .map(event => true)
 
-  const dUp$ = Keys.up('D')
-    .map(event => false)
+    const up$ = Keys.up(key)
+      .map(event => false)
 
-  const d$ = Observable.merge(
-    dDown$,
-    dUp$
-  )
+    return Observable.merge(
+      down$,
+      up$
+    ).startWith(false)
+  }
+
+  const keys$ = combineLatestObj({
+    W$: isDown('W'),
+    A$: isDown('A'),
+    S$: isDown('S'),
+    D$: isDown('D')
+  })
+
 
   const update$ = Animation.pluck('delta')
-    .withLatestFrom(d$, (delta, dIsDown) => update(delta/FRAMERATE, dIsDown))
+    .withLatestFrom(keys$, (delta, keys) => update(delta/FRAMERATE, keys))
 
   initialState.board[0][4].plant = true
 
