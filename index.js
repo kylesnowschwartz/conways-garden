@@ -2,8 +2,9 @@ import Cycle from '@cycle/core'
 import {makeDOMDriver, div, button} from '@cycle/dom'
 import {Observable} from 'rx'
 import _ from 'lodash'
+import {makeKeysDriver} from 'cycle-keys';
 
-function makeBoard({rows, columns}) {
+function Board({rows, columns}) {
   return (
     _.range(0, rows).map((row, rowIndex) =>
       _.range(0, columns).map((column, columnIndex) => Tile({
@@ -11,6 +12,20 @@ function makeBoard({rows, columns}) {
         column: columnIndex
       }))
     )
+  )
+}
+
+function Gardener({position}) {
+  return {
+    position
+  }
+}
+
+function renderGardener({position}) {
+  const style = {left: position.x + 'px', top: position.y + 'px'}
+
+  return (
+    div('.gardener', {style})
   )
 }
 
@@ -30,20 +45,45 @@ function renderRow(row) {
   )
 }
 
-function view({board}) {
+function view({board, gardener}) {
   return (
-    div('.board', board.map(renderRow))
+    div('.game', [
+      div('.board', board.map(renderRow)),
+      renderGardener(gardener)
+    ])
   )
 }
 
-function main({DOM}) {
+function update(state) {
+  state.gardener.position.x += 10
+
+  return state
+}
+
+//capture a keys stream
+  //log some output when you press a key
+  //
+
+
+function main({DOM, Keys}) {
   const initialState = {
-    board: makeBoard({rows: 20, columns: 20})
+    board: Board({rows: 20, columns: 20}),
+    gardener: Gardener({position: {x: 200, y: 150}})
   }
+
+  const d$ = Keys.press('d')
+
+  const moveGardener$
+
+  const update$ = Observable
+    .interval(100)
+    .map(() => update)
 
   initialState.board[0][4].plant = true
 
-  const state$ = Observable.just(initialState)
+  const state$ = update$
+    .startWith(initialState)
+    .scan((state, action) => action(state))
 
   return {
     DOM: state$.map(view)
@@ -51,7 +91,8 @@ function main({DOM}) {
 }
 
 const drivers = {
-  DOM: makeDOMDriver('.app')
+  DOM: makeDOMDriver('.app'),
+  Keys: makeKeysDriver()
 }
 
 Cycle.run(main, drivers)

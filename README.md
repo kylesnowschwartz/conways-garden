@@ -2,7 +2,7 @@
 
 Todo
 
-- [ ] make a grid
+- [x] make a grid
 - [ ] create a gardener (who can move)
 - [ ] the gardener can plant a plant
 - [ ] the gardener can remove a plant
