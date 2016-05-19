@@ -1,0 +1,31 @@
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: black;
+  color: white;
+}
+
+.row {
+  height: 30px;
+}
+
+.tile {
+  display: inline-block;
+  width: 30px;
+  height: 30px;
+}
+
+.plant {
+  background: forestgreen;
+}
+
+.gardener {
+  position: absolute;
+  background: yellow;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+}
