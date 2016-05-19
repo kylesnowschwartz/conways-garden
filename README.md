@@ -8,8 +8,8 @@ MVP
 - [x] create a gardener (who can move)
 - [x] the gardener can plant a plant
 - [x] the gardener can remove a plant
-- [ ] plants then follow conway rules
-- [ ] make a world pulse, each pulse iterates conway
+- [x] plants then follow conway rules
+- [x] make a world pulse, each pulse iterates conway
 - [ ] pulse plays a sound per living plant
 - [ ] y axis the key
 - [ ] x axis the octave
