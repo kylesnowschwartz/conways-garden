@@ -8,6 +8,8 @@ import combineLatestObj from 'rx-combine-latest-obj'
 import uuid from 'node-uuid'
 import Tone from 'tone'
 
+import lodashMath from 'lodash-math';
+
 const FRAMERATE = 1000 / 60
 
 const BOARDSIZE = 20
@@ -18,6 +20,13 @@ const octave = "G A C D E G".split(" ");
 
 const synth = new Tone.PolySynth(BOARDSIZE * 2, Tone.SimpleFM).toMaster()
 synth.set("volume", -10);
+
+const nursery = [
+  {duration: 1, color: 'forestgreen'}, 
+  {duration: 2, color: 'lime'},
+  {duration: 4, color: 'lightgreen'}, 
+  {duration: 8, color: '#B8F5C0'}
+]
 
 function Board({rows, columns}) {
   return (
@@ -48,14 +57,16 @@ function renderGardener({id, position}) {
   )
 }
 
-function Tile({row, column, plant = false, age = 0, id = uuid.v4()}) {
-  return {row, column, plant, age, id}
+function Tile({row, column, plant = false, age = 0, duration = 1, id = uuid.v4(), color = 'black'}) {
+  return {row, column, plant, duration, age, id, color}
 }
 
 function renderTile(tile, tileAtGardenerPosition) {
   const classes = `.tile ${tile.plant ? '.plant' : '' } ${tileAtGardenerPosition ? '.outline' : '' }`
 
-  const style = {}
+  const style = {
+    background: tile.color
+  }
 
   if (tile.plant && tile.age < PLANT_MATURITY_AGE) {
     const borderThickness = 14 - (14 * tile.age / PLANT_MATURITY_AGE);
@@ -74,13 +85,27 @@ function renderRow(row, tileAtGardenerPosition) {
   )
 }
 
-function view({board, gardener}) {
+function renderNursery(nursery, selectedPlantIndex) {
+  return (
+    div('.nursery', nursery.map((plant, index) =>
+      div(
+        `.nursery-slot ${index === selectedPlantIndex ? '.selected' : ''}`,
+        {style: {background: plant.color}},
+        plant.duration.toString()
+      )
+    ))
+  )
+}
+
+function view({board, gardener, nursery, selectedPlantIndex}) {
   const tileAtGardenerPosition = tileAtPosition(board, gardener.position)
 
   return (
     div('.game', [
       div('.board', board.map(row => renderRow(row, tileAtGardenerPosition))),
-      renderGardener(gardener)
+      renderGardener(gardener),
+
+      renderNursery(nursery, selectedPlantIndex)
     ])
   )
 }
@@ -147,14 +172,26 @@ function update(delta, keysDown) {
   }
 }
 
+// http://stackoverflow.com/a/20762713
+function mode(arr){
+  return arr.sort((a,b) =>
+      arr.filter(v => v===a).length
+    - arr.filter(v => v===b).length
+  ).pop();
+}
+
 function applyConwayRules(board) {
   return board.map(row => 
     row.map(tile => {
-      const liveNeighbors = numberOfLiveNeighbors(board, tile)
+      const neighbors = liveNeighbors(board, tile);
+      const liveNeighborsCount = neighbors.length;
 
       if (!tile.plant) {
-        if (liveNeighbors === 3) {
-          return Tile({...tile, plant: true, age: PLANT_MATURITY_AGE})
+        if (liveNeighborsCount === 3) {
+          const durationMode = mode(neighbors.map(neighbor => neighbor.duration));
+          const color = mode(neighbors.map(neighbor => neighbor.color))
+
+          return Tile({...tile, plant: true, age: PLANT_MATURITY_AGE, duration: durationMode, color})
         } else {
           return tile
         }
@@ -164,20 +201,22 @@ function applyConwayRules(board) {
         return tile;
       }
 
-      if (liveNeighbors < 2) {
-        return Tile({...tile, plant: false, age: 0})
-      } else if (liveNeighbors <= 3) {
+      if (liveNeighborsCount < 2) {
+        return Tile({...tile, plant: false, age: 0, color: 'black'})
+      } else if (liveNeighborsCount <= 3) {
         return tile
-      } else if (liveNeighbors > 3) {
-        return Tile({...tile, plant: false, age: 0})
+      } else if (liveNeighborsCount > 3) {
+        return Tile({...tile, plant: false, age: 0, color: 'black'})
       } 
     })
   )
 }
 
-function applyMusicRules(state) {
+function applyMusicRules(state, noteDuration) {
   const notes =  state.board.map(row => 
-    row.map(tile => applyNote(tile))
+    row
+      .filter(tile => tile.duration === noteDuration)
+      .map(tile => applyNote(tile))
   )
 
   return _.compact(_.flatten(notes))
@@ -199,7 +238,7 @@ function pulse(state) {
   }
 }
 
-function numberOfLiveNeighbors(board, tile) {
+function liveNeighbors(board, tile) {
   function positionIsOnBoard ({row, column}) {
     const boardSize = board.length; // trololololo better hope the board is square
 
@@ -233,7 +272,6 @@ function numberOfLiveNeighbors(board, tile) {
   return actualNeighborPositions
     .map(neighbor => board[neighbor.row][neighbor.column])
     .filter(neighbor => neighbor.plant)
-    .length
 }
 
 function tileAtPosition(board, position) {
@@ -248,8 +286,30 @@ function plant(state) {
 
   tile.plant = true
   tile.age = 0
+  tile.duration = selectedPlant(state).duration
+  tile.color = selectedPlant(state).color
 
   return state
+}
+
+function selectedPlant(state) {
+  return state.nursery[state.selectedPlantIndex]
+}
+
+function previousNurseryPlant (state) {
+  return {
+    ...state,
+
+    selectedPlantIndex: state.selectedPlantIndex - 1
+  }
+}
+
+function nextNurseryPlant (state) {
+  return {
+    ...state,
+
+    selectedPlantIndex: state.selectedPlantIndex + 1
+  }
 }
 
 function main({DOM, Keys, Animation}) {
@@ -280,18 +340,34 @@ function main({DOM, Keys, Animation}) {
   const update$ = Animation.pluck('delta')
     .withLatestFrom(keys$, (delta, keys) => update(delta/FRAMERATE, keys))
 
-  const pulse$ = Observable.interval(500)
+  const tick$ = Observable.interval(400 / 8)
+    .shareReplay()
+  
+  const pulse$ = tick$
+    .filter((__, i) => i % 8 === 0)
     .map(event => pulse)
+
+  const previousNurseryPlant$ = Keys
+    .down('left')
+    .map(event => previousNurseryPlant);
+
+  const nextNurseryPlant$ = Keys
+    .down('right')
+    .map(event => nextNurseryPlant);
 
   const action$ = Observable.merge(
     update$,
     plant$,
-    pulse$
+    pulse$,
+    previousNurseryPlant$,
+    nextNurseryPlant$
   )
 
   const initialState = {
     board: Board({rows: BOARDSIZE, columns: BOARDSIZE}),
-    gardener: Gardener({position: {x: 200, y: 150}})
+    gardener: Gardener({position: {x: 200, y: 150}}),
+    nursery,
+    selectedPlantIndex: 0
   }
 
   const state$ = action$
@@ -299,8 +375,27 @@ function main({DOM, Keys, Animation}) {
     .scan((state, action) => action(state))
     .shareReplay()
 
-  const notes$ = pulse$
-    .withLatestFrom(state$, (__, state) => applyMusicRules(state) )
+  const wholeNotes$ = pulse$
+    .filter((__, i) => i % 8 === 0)
+    .withLatestFrom(state$, (__, state) => applyMusicRules(state, 1) )
+
+  const halfNotes$ = pulse$
+    .filter((__, i) => i % 4 === 0)
+    .withLatestFrom(state$, (__, state) => applyMusicRules(state, 2) )
+
+  const quarterNotes$ = pulse$
+    .filter((__, i) => i % 2 === 0)
+    .withLatestFrom(state$, (__, state) => applyMusicRules(state, 4) )
+
+  const eightNotes$ = pulse$
+    .withLatestFrom(state$, (__, state) => applyMusicRules(state, 8) )
+
+  const notes$ = Observable.merge(
+    wholeNotes$,
+    halfNotes$,
+    quarterNotes$,
+    eightNotes$
+  )
 
   return {
     DOM: state$.map(view),
