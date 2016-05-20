@@ -46,9 +46,9 @@ var PLANT_MATURITY_AGE = 3000 / FRAMERATE; // msec
 var octave = "G A C D E G".split(" ");
 
 var synth = new _tone2.default.PolySynth(BOARDSIZE * 2, _tone2.default.SimpleFM).toMaster();
-synth.set("volume", -10);
+synth.set('volume', -10);
 
-var nursery = [{ duration: 1, color: 'forestgreen' }, { duration: 2, color: 'lime' }, { duration: 4, color: 'lightgreen' }, { duration: 8, color: '#B8F5C0' }];
+var nursery = [{ duration: 1, color: '#AD1457' }, { duration: 2, color: '#D81B60' }, { duration: 4, color: '#EC407A' }, { duration: 8, color: '#F48FB1' }];
 
 function Board(_ref) {
   var rows = _ref.rows;
@@ -128,7 +128,7 @@ function renderRow(row, tileAtGardenerPosition) {
 
 function renderNursery(nursery, selectedPlantIndex) {
   return (0, _dom.div)('.nursery', nursery.map(function (plant, index) {
-    return (0, _dom.div)('.nursery-slot ' + (index === selectedPlantIndex ? '.selected' : ''), { style: { background: plant.color } }, plant.duration.toString());
+    return (0, _dom.div)('.nursery-slot ' + (index === selectedPlantIndex ? '.selected' : ''), { style: { background: plant.color } }, '1/' + plant.duration);
   }));
 }
 
@@ -345,14 +345,14 @@ function selectedPlant(state) {
 function previousNurseryPlant(state) {
   return _extends({}, state, {
 
-    selectedPlantIndex: state.selectedPlantIndex - 1
+    selectedPlantIndex: state.selectedPlantIndex === 0 ? 3 : state.selectedPlantIndex - 1
   });
 }
 
 function nextNurseryPlant(state) {
   return _extends({}, state, {
 
-    selectedPlantIndex: state.selectedPlantIndex + 1
+    selectedPlantIndex: (state.selectedPlantIndex + 1) % nursery.length
   });
 }
 
@@ -390,9 +390,9 @@ function main(_ref8) {
     return update(delta / FRAMERATE, keys);
   });
 
-  var tick$ = _rx.Observable.interval(400 / 8).shareReplay();
+  var tick$ = _rx.Observable.interval(50).shareReplay();
 
-  var pulse$ = tick$.filter(function (__, i) {
+  var pulse$ = tick$.filter(function (i) {
     return i % 8 === 0;
   }).map(function (event) {
     return pulse;
@@ -419,25 +419,25 @@ function main(_ref8) {
     return action(state);
   }).shareReplay();
 
-  var wholeNotes$ = pulse$.filter(function (__, i) {
+  var wholeNotes$ = tick$.filter(function (i) {
     return i % 8 === 0;
   }).withLatestFrom(state$, function (__, state) {
     return applyMusicRules(state, 1);
   });
 
-  var halfNotes$ = pulse$.filter(function (__, i) {
+  var halfNotes$ = tick$.filter(function (i) {
     return i % 4 === 0;
   }).withLatestFrom(state$, function (__, state) {
     return applyMusicRules(state, 2);
   });
 
-  var quarterNotes$ = pulse$.filter(function (__, i) {
+  var quarterNotes$ = tick$.filter(function (i) {
     return i % 2 === 0;
   }).withLatestFrom(state$, function (__, state) {
     return applyMusicRules(state, 4);
   });
 
-  var eightNotes$ = pulse$.withLatestFrom(state$, function (__, state) {
+  var eightNotes$ = tick$.withLatestFrom(state$, function (__, state) {
     return applyMusicRules(state, 8);
   });
 

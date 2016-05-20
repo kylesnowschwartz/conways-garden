@@ -19,13 +19,13 @@ const PLANT_MATURITY_AGE = 3000 / FRAMERATE // msec
 const octave = "G A C D E G".split(" ");
 
 const synth = new Tone.PolySynth(BOARDSIZE * 2, Tone.SimpleFM).toMaster()
-synth.set("volume", -10);
+synth.set('volume', -10)
 
 const nursery = [
-  {duration: 1, color: 'forestgreen'}, 
-  {duration: 2, color: 'lime'},
-  {duration: 4, color: 'lightgreen'}, 
-  {duration: 8, color: '#B8F5C0'}
+  {duration: 1, color: '#AD1457'},
+  {duration: 2, color: '#D81B60'},
+  {duration: 4, color: '#EC407A'},
+  {duration: 8, color: '#F48FB1'}
 ]
 
 function Board({rows, columns}) {
@@ -91,7 +91,7 @@ function renderNursery(nursery, selectedPlantIndex) {
       div(
         `.nursery-slot ${index === selectedPlantIndex ? '.selected' : ''}`,
         {style: {background: plant.color}},
-        plant.duration.toString()
+        `1/${plant.duration}`
       )
     ))
   )
@@ -300,7 +300,7 @@ function previousNurseryPlant (state) {
   return {
     ...state,
 
-    selectedPlantIndex: state.selectedPlantIndex - 1
+    selectedPlantIndex: state.selectedPlantIndex === 0 ? 3 : state.selectedPlantIndex - 1
   }
 }
 
@@ -308,7 +308,7 @@ function nextNurseryPlant (state) {
   return {
     ...state,
 
-    selectedPlantIndex: state.selectedPlantIndex + 1
+    selectedPlantIndex: (state.selectedPlantIndex + 1) % nursery.length
   }
 }
 
@@ -340,11 +340,11 @@ function main({DOM, Keys, Animation}) {
   const update$ = Animation.pluck('delta')
     .withLatestFrom(keys$, (delta, keys) => update(delta/FRAMERATE, keys))
 
-  const tick$ = Observable.interval(400 / 8)
+  const tick$ = Observable.interval(50)
     .shareReplay()
   
   const pulse$ = tick$
-    .filter((__, i) => i % 8 === 0)
+    .filter((i) => i % 8 === 0)
     .map(event => pulse)
 
   const previousNurseryPlant$ = Keys
@@ -375,19 +375,19 @@ function main({DOM, Keys, Animation}) {
     .scan((state, action) => action(state))
     .shareReplay()
 
-  const wholeNotes$ = pulse$
-    .filter((__, i) => i % 8 === 0)
+  const wholeNotes$ = tick$
+    .filter((i) => i % 8 === 0)
     .withLatestFrom(state$, (__, state) => applyMusicRules(state, 1) )
 
-  const halfNotes$ = pulse$
-    .filter((__, i) => i % 4 === 0)
+  const halfNotes$ = tick$
+    .filter((i) => i % 4 === 0)
     .withLatestFrom(state$, (__, state) => applyMusicRules(state, 2) )
 
-  const quarterNotes$ = pulse$
-    .filter((__, i) => i % 2 === 0)
+  const quarterNotes$ = tick$
+    .filter((i) => i % 2 === 0)
     .withLatestFrom(state$, (__, state) => applyMusicRules(state, 4) )
 
-  const eightNotes$ = pulse$
+  const eightNotes$ = tick$
     .withLatestFrom(state$, (__, state) => applyMusicRules(state, 8) )
 
   const notes$ = Observable.merge(
