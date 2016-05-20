@@ -136,16 +136,30 @@ function updateGardener(gardener, delta, keysDown) {
   return {
     ...gardener,
 
-    position: {
-      x: gardener.position.x + gardener.velocity.x * delta,
-      y: gardener.position.y + gardener.velocity.y * delta
-    },
+    position: calculatePosition(gardener, delta),
 
-    velocity: {
-      x: (gardener.velocity.x + accelerationChange.x * delta) * (gardener.friction / delta),
-      y: (gardener.velocity.y + accelerationChange.y * delta) * (gardener.friction / delta)
-    }
+    velocity: calculateVelocity(gardener, delta, accelerationChange)
   }
+}
+
+function calculateVelocity(gardener, delta, accelerationChange) {
+  const xVelocity = (gardener.velocity.x + accelerationChange.x * delta) * (gardener.friction / delta);
+  const yVelocity = (gardener.velocity.y + accelerationChange.y * delta) * (gardener.friction / delta);
+
+  return {
+    x: positionIsOnBoard(calculatePosition(gardener, delta)) ? xVelocity : 0,
+    y: positionIsOnBoard(calculatePosition(gardener, delta)) ? yVelocity : 0
+  }
+}
+
+function calculatePosition(gardener, delta) {
+  const xPosition = gardener.position.x + gardener.velocity.x * delta;
+  const yPosition = gardener.position.y + gardener.velocity.y * delta;
+
+  return {
+      x: xPosition,
+      y: yPosition
+    }
 }
 
 function updateBoard(board, delta) {
@@ -238,6 +252,7 @@ function pulse(state) {
   }
 }
 
+
 function liveNeighbors(board, tile) {
   function positionIsOnBoard ({row, column}) {
     const boardSize = board.length; // trololololo better hope the board is square
@@ -252,7 +267,6 @@ function liveNeighbors(board, tile) {
 
     return true;
   }
-
 
   const potentialNeighbors = [
     {column: -1, row: -1}, //NW
