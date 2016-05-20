@@ -8,12 +8,25 @@ body {
   color: white;
 }
 
+
+.game {
+  box-sizing: border-box;
+  border: 2px solid saddlebrown;
+  width: 600px;
+}
+
+.board {
+  width: 600px;
+}
+
 .row {
   height: 30px;
+  width: 600px;
 }
 
 .tile {
   display: inline-block;
+  box-sizing: border-box;
   width: 30px;
   height: 30px;
 }
@@ -28,4 +41,8 @@ body {
   width: 25px;
   height: 25px;
   border-radius: 50%;
+}
+
+.outline {
+  border: 1px solid lightblue;
 }
