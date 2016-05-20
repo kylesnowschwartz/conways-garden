@@ -25,7 +25,8 @@
     "lodash": "^4.12.0",
     "node-uuid": "^1.4.7",
     "rx": "^4.1.0",
-    "rx-combine-latest-obj": "^1.0.2"
+    "rx-combine-latest-obj": "^1.0.2",
+    "tone": "^0.6.1"
   },
   "devDependencies": {
     "babel-cli": "^6.9.0",

@@ -8,8 +8,20 @@ body {
   color: white;
 }
 
+
+.game {
+  box-sizing: border-box;
+  border: 2px solid saddlebrown;
+  width: 600px;
+}
+
+.board {
+  width: 600px;
+}
+
 .row {
   height: 30px;
+  width: 600px;
 }
 
 .tile {

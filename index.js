@@ -6,12 +6,18 @@ import {makeKeysDriver} from 'cycle-keys'
 import {makeAnimationDriver} from 'cycle-animation-driver'
 import combineLatestObj from 'rx-combine-latest-obj'
 import uuid from 'node-uuid'
+import Tone from 'tone'
 
 const FRAMERATE = 1000 / 60
 
-const BOARDSIZE = 30
+const BOARDSIZE = 20
 
 const PLANT_MATURITY_AGE = 3000 / FRAMERATE // msec
+
+const octave = "G A C D E G".split(" ");
+
+const synth = new Tone.PolySynth(BOARDSIZE * 2, Tone.SimpleFM).toMaster()
+synth.set("volume", -10);
 
 function Board({rows, columns}) {
   return (
@@ -24,20 +30,21 @@ function Board({rows, columns}) {
   )
 }
 
-function Gardener({position}) {
+function Gardener({position, id = uuid.v4()}) {
   return {
     velocity: {x:0, y:0},
-    acceleration: 0.2,
+    acceleration: 0.4,
     friction: .94,
-    position
+    position,
+    id
   }
 }
 
-function renderGardener({position}) {
+function renderGardener({id, position}) {
   const style = {left: position.x + 'px', top: position.y + 'px'}
 
   return (
-    div('.gardener', {style})
+    div('.gardener', {style, key: id})
   )
 }
 
@@ -110,8 +117,8 @@ function updateGardener(gardener, delta, keysDown) {
     },
 
     velocity: {
-      x: (gardener.velocity.x + accelerationChange.x * delta) * gardener.friction,
-      y: (gardener.velocity.y + accelerationChange.y * delta) * gardener.friction
+      x: (gardener.velocity.x + accelerationChange.x * delta) * (gardener.friction / delta),
+      y: (gardener.velocity.y + accelerationChange.y * delta) * (gardener.friction / delta)
     }
   }
 }
@@ -140,15 +147,13 @@ function update(delta, keysDown) {
   }
 }
 
-function pulse(state) {
-  const newBoard = state.board.map(row => 
+function applyConwayRules(board) {
+  return board.map(row => 
     row.map(tile => {
-      const liveNeighbors = numberOfLiveNeighbors(state.board, tile)
-
+      const liveNeighbors = numberOfLiveNeighbors(board, tile)
 
       if (!tile.plant) {
         if (liveNeighbors === 3) {
-          console.log(liveNeighbors)
           return Tile({...tile, plant: true, age: PLANT_MATURITY_AGE})
         } else {
           return tile
@@ -168,10 +173,29 @@ function pulse(state) {
       } 
     })
   )
+}
 
+function applyMusicRules(state) {
+  const notes =  state.board.map(row => 
+    row.map(tile => applyNote(tile))
+  )
+
+  return _.compact(_.flatten(notes))
+}
+
+function applyNote(tile) {
+  if (tile.plant && tile.age >= PLANT_MATURITY_AGE) {
+    const register = Math.floor(tile.column / 8 + 2);
+    
+    return octave[tile.row % octave.length] + register.toString();
+  }
+}
+
+function pulse(state) {
   return {
     ...state,
-    board: newBoard 
+    board: applyConwayRules(state.board)
+
   }
 }
 
@@ -222,7 +246,7 @@ function tileAtPosition(board, position) {
 function plant(state) {
   const tile = tileAtPosition(state.board, state.gardener.position)
 
-  tile.plant = !tile.plant
+  tile.plant = true
   tile.age = 0
 
   return state
@@ -256,7 +280,7 @@ function main({DOM, Keys, Animation}) {
   const update$ = Animation.pluck('delta')
     .withLatestFrom(keys$, (delta, keys) => update(delta/FRAMERATE, keys))
 
-  const pulse$ = Observable.interval(1500)
+  const pulse$ = Observable.interval(500)
     .map(event => pulse)
 
   const action$ = Observable.merge(
@@ -273,16 +297,23 @@ function main({DOM, Keys, Animation}) {
   const state$ = action$
     .startWith(initialState)
     .scan((state, action) => action(state))
+    .shareReplay()
+
+  const notes$ = pulse$
+    .withLatestFrom(state$, (__, state) => applyMusicRules(state) )
 
   return {
-    DOM: state$.map(view)
+    DOM: state$.map(view),
+    Music: notes$
   }
 }
 
 const drivers = {
   DOM: makeDOMDriver('.app'),
   Keys: makeKeysDriver(),
-  Animation: makeAnimationDriver()
+  Animation: makeAnimationDriver(),
+  Music: notes$ => notes$.subscribe(notes => synth.triggerAttackRelease(notes, "4n"))
 }
 
 Cycle.run(main, drivers)
+
