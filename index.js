@@ -39,9 +39,9 @@ function Board({rows, columns}) {
   )
 }
 
-function Gardener({position, id = uuid.v4()}) {
+function Gardener({position, velocity, id = uuid.v4()}) {
   return {
-    velocity: {x:0, y:0},
+    velocity,
     acceleration: 0.4,
     friction: .94,
     position,
@@ -133,6 +133,12 @@ function updateGardener(gardener, delta, keysDown) {
     accelerationChange.x += acceleration
   }
 
+  console.log(
+    'gardener', 
+    calculatePosition(gardener, delta), 
+    gardenerIsOnBoard(calculatePosition(gardener, delta))
+  )
+
   return {
     ...gardener,
 
@@ -142,6 +148,20 @@ function updateGardener(gardener, delta, keysDown) {
   }
 }
 
+function gardenerIsOnBoard ({row, column}) {
+  if (row < 0) {
+    return false;
+  } else if (column < 0) {
+    return false;
+  } else if (row > BOARDSIZE - 1) {
+    return false;
+  } else if (column > BOARDSIZE - 1) {
+    return false;
+  } else {
+    return true;
+  }
+
+}
 function positionIsOnBoard ({row, column}) {
   if (row < 0 || column < 0) {
     return false;
@@ -159,8 +179,8 @@ function calculateVelocity(gardener, delta, accelerationChange) {
   const yVelocity = (gardener.velocity.y + accelerationChange.y * delta) * (gardener.friction / delta);
 
   return {
-    x: positionIsOnBoard(calculatePosition(gardener, delta)) ? xVelocity : 0,
-    y: positionIsOnBoard(calculatePosition(gardener, delta)) ? yVelocity : 0
+    x: xVelocity,
+    y: yVelocity
   }
 }
 
@@ -168,10 +188,17 @@ function calculatePosition(gardener, delta) {
   const xPosition = gardener.position.x + gardener.velocity.x * delta;
   const yPosition = gardener.position.y + gardener.velocity.y * delta;
 
-  return {
-      x: xPosition,
-      y: yPosition
+  if (gardenerIsOnBoard({xPosition, yPosition})) {
+    return {
+        x: xPosition,
+        y: yPosition
+      }
+  } else {
+    return {
+      x: gardener.position.x,
+      y: gardener.position.y
     }
+  }
 }
 
 function updateBoard(board, delta) {
@@ -382,7 +409,10 @@ function main({DOM, Keys, Animation}) {
 
   const initialState = {
     board: Board({rows: BOARDSIZE, columns: BOARDSIZE}),
-    gardener: Gardener({position: {x: 200, y: 150}}),
+    gardener: Gardener({
+      position: {x: 200, y: 150},
+      velocity: {x:0, y: 0}
+    }),
     nursery,
     selectedPlantIndex: 0
   }
