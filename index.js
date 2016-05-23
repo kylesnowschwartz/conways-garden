@@ -142,6 +142,18 @@ function updateGardener(gardener, delta, keysDown) {
   }
 }
 
+function positionIsOnBoard ({row, column}) {
+  if (row < 0 || column < 0) {
+    return false;
+  }
+
+  if (row > BOARDSIZE - 1 || column > BOARDSIZE - 1) {
+    return false;
+  }
+
+  return true;
+}
+
 function calculateVelocity(gardener, delta, accelerationChange) {
   const xVelocity = (gardener.velocity.x + accelerationChange.x * delta) * (gardener.friction / delta);
   const yVelocity = (gardener.velocity.y + accelerationChange.y * delta) * (gardener.friction / delta);
@@ -252,22 +264,7 @@ function pulse(state) {
   }
 }
 
-
 function liveNeighbors(board, tile) {
-  function positionIsOnBoard ({row, column}) {
-    const boardSize = board.length; // trololololo better hope the board is square
-
-    if (row < 0 || column < 0) {
-      return false;
-    }
-
-    if (row > boardSize - 1 || column > boardSize - 1) {
-      return false;
-    }
-
-    return true;
-  }
-
   const potentialNeighbors = [
     {column: -1, row: -1}, //NW
     {column: 0, row: -1},  //N
@@ -292,16 +289,22 @@ function tileAtPosition(board, position) {
   let row = Math.round(position.y / 30)
   let column = Math.round(position.x / 30)
 
-  return board[row][column]
+  if (positionIsOnBoard({row, column})) {
+    return board[row][column];
+  }
+
+  return false
 }
 
 function plant(state) {
   const tile = tileAtPosition(state.board, state.gardener.position)
 
-  tile.plant = true
-  tile.age = 0
-  tile.duration = selectedPlant(state).duration
-  tile.color = selectedPlant(state).color
+  if (tile) {
+    tile.plant = true
+    tile.age = 0
+    tile.duration = selectedPlant(state).duration
+    tile.color = selectedPlant(state).color
+  }
 
   return state
 }
