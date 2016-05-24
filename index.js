@@ -166,7 +166,6 @@ function calculateVelocity(gardener, delta, accelerationChange) {
 function calculatePosition(gardener, delta) {
   const xPosition = gardener.position.x + gardener.velocity.x * delta;
   const yPosition = gardener.position.y + gardener.velocity.y * delta;
-
   let row = xPosition / PATCHSIZE
   let column = yPosition / PATCHSIZE
 
@@ -178,8 +177,6 @@ function calculatePosition(gardener, delta) {
   } else {
     let xWrapped = xPosition;
     let yWrapped = yPosition;
-
-    console.log(gardener.position)
 
     if (xPosition > BOARDSIZE_IN_PX) {
       xWrapped = xPosition - BOARDSIZE_IN_PX
@@ -319,13 +316,7 @@ function tileAtPosition(board, position) {
   let row = Math.round(position.y / PATCHSIZE)
   let column = Math.round(position.x / PATCHSIZE)
 
-  // console.log(position)
-  // console.log(row, column)
-  if (positionIsOnBoard({row, column})) {
-    return board[row][column];
-  }
-
-  return false
+  return board[row][column];
 }
 
 function plant(state) {
