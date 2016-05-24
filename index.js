@@ -11,14 +11,13 @@ import Tone from 'tone'
 import lodashMath from 'lodash-math';
 
 const FRAMERATE = 1000 / 60
-
 const BOARDSIZE = 20
-
+const PATCHSIZE = 30 //px
+const BOARDSIZE_IN_PX = BOARDSIZE * PATCHSIZE
 const PLANT_MATURITY_AGE = 3000 / FRAMERATE // msec
-
-const octave = "G A C D E G".split(" ");
-
+const octave = "G A G B G C# G D# G F G".split(" ") //"G A G C D G E G".split(" ");
 const synth = new Tone.PolySynth(BOARDSIZE * 2, Tone.SimpleFM).toMaster()
+
 synth.set('volume', -10)
 
 const nursery = [
@@ -133,12 +132,6 @@ function updateGardener(gardener, delta, keysDown) {
     accelerationChange.x += acceleration
   }
 
-  console.log(
-    'gardener', 
-    calculatePosition(gardener, delta), 
-    gardenerIsOnBoard(calculatePosition(gardener, delta))
-  )
-
   return {
     ...gardener,
 
@@ -148,20 +141,6 @@ function updateGardener(gardener, delta, keysDown) {
   }
 }
 
-function gardenerIsOnBoard ({row, column}) {
-  if (row < 0) {
-    return false;
-  } else if (column < 0) {
-    return false;
-  } else if (row > BOARDSIZE - 1) {
-    return false;
-  } else if (column > BOARDSIZE - 1) {
-    return false;
-  } else {
-    return true;
-  }
-
-}
 function positionIsOnBoard ({row, column}) {
   if (row < 0 || column < 0) {
     return false;
@@ -188,15 +167,39 @@ function calculatePosition(gardener, delta) {
   const xPosition = gardener.position.x + gardener.velocity.x * delta;
   const yPosition = gardener.position.y + gardener.velocity.y * delta;
 
-  if (gardenerIsOnBoard({xPosition, yPosition})) {
+  let row = xPosition / PATCHSIZE
+  let column = yPosition / PATCHSIZE
+
+  if (positionIsOnBoard({row, column})) {
     return {
         x: xPosition,
         y: yPosition
       }
   } else {
+    let xWrapped = xPosition;
+    let yWrapped = yPosition;
+
+    console.log(gardener.position)
+
+    if (xPosition > BOARDSIZE_IN_PX) {
+      xWrapped = xPosition - BOARDSIZE_IN_PX
+    }
+
+    if (xPosition < 0) {
+      xWrapped = xPosition + BOARDSIZE_IN_PX
+    }
+
+    if (yPosition > BOARDSIZE_IN_PX) {
+      yWrapped = yPosition - BOARDSIZE_IN_PX
+    }
+
+    if (yPosition < 0) {
+      yWrapped = yPosition + BOARDSIZE_IN_PX
+    }
+
     return {
-      x: gardener.position.x,
-      y: gardener.position.y
+      x: xWrapped,
+      y: yWrapped
     }
   }
 }
@@ -313,9 +316,11 @@ function liveNeighbors(board, tile) {
 }
 
 function tileAtPosition(board, position) {
-  let row = Math.round(position.y / 30)
-  let column = Math.round(position.x / 30)
+  let row = Math.round(position.y / PATCHSIZE)
+  let column = Math.round(position.x / PATCHSIZE)
 
+  // console.log(position)
+  // console.log(row, column)
   if (positionIsOnBoard({row, column})) {
     return board[row][column];
   }
@@ -384,7 +389,7 @@ function main({DOM, Keys, Animation}) {
   const update$ = Animation.pluck('delta')
     .withLatestFrom(keys$, (delta, keys) => update(delta/FRAMERATE, keys))
 
-  const tick$ = Observable.interval(50)
+  const tick$ = Observable.interval(400)
     .shareReplay()
   
   const pulse$ = tick$
