@@ -316,7 +316,10 @@ function tileAtPosition(board, position) {
   let row = Math.round(position.y / PATCHSIZE)
   let column = Math.round(position.x / PATCHSIZE)
 
-  return board[row][column];
+ if (positionIsOnBoard({row, column})) {
+   return board[row][column];
+ }
+
 }
 
 function plant(state) {
