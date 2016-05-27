@@ -1,5 +1,5 @@
 import Cycle from '@cycle/core'
-import {makeDOMDriver, div, button} from '@cycle/dom'
+import {makeDOMDriver, div, button, input} from '@cycle/dom'
 import {Observable} from 'rx'
 import _ from 'lodash'
 import {makeKeysDriver} from 'cycle-keys'
@@ -16,6 +16,12 @@ const PATCHSIZE = 30 //px
 const BOARDSIZE_IN_PX = BOARDSIZE * PATCHSIZE
 const PLANT_MATURITY_AGE = 3000 / FRAMERATE // msec
 const octave = "G A G B G C# G D# G F G".split(" ") //"G A G C D G E G".split(" ");
+
+const MAX_TIMESCALE = 250
+const MIN_TIMESCALE = 50
+
+const octave = "G A C D E G".split(" ");
+
 const synth = new Tone.PolySynth(BOARDSIZE * 2, Tone.SimpleFM).toMaster()
 
 synth.set('volume', -10)
@@ -104,7 +110,9 @@ function view({board, gardener, nursery, selectedPlantIndex}) {
       div('.board', board.map(row => renderRow(row, tileAtGardenerPosition))),
       renderGardener(gardener),
 
-      renderNursery(nursery, selectedPlantIndex)
+      renderNursery(nursery, selectedPlantIndex),
+
+      input('.timescale', {attributes: {type: 'range', min: MIN_TIMESCALE, max: MAX_TIMESCALE}}),
     ])
   )
 }
@@ -383,7 +391,14 @@ function main({DOM, Keys, Animation}) {
   const update$ = Animation.pluck('delta')
     .withLatestFrom(keys$, (delta, keys) => update(delta/FRAMERATE, keys))
 
-  const tick$ = Observable.interval(400)
+
+  const timescale$ = DOM
+    .select('.timescale')
+    .events('change')
+    .map(event => event.target.value)
+    .startWith(150);
+
+  const tick$ = timescale$.flatMapLatest(timescale => Observable.interval((MAX_TIMESCALE + MIN_TIMESCALE) - timescale))
     .shareReplay()
   
   const pulse$ = tick$
