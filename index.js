@@ -15,15 +15,12 @@ const BOARDSIZE = 20
 const PATCHSIZE = 30 //px
 const BOARDSIZE_IN_PX = BOARDSIZE * PATCHSIZE
 const PLANT_MATURITY_AGE = 3000 / FRAMERATE // msec
-const octave = "G A G B G C# G D# G F G".split(" ") //"G A G C D G E G".split(" ");
 
 const MAX_TIMESCALE = 250
 const MIN_TIMESCALE = 50
 
 const octave = "G A C D E G".split(" ");
-
 const synth = new Tone.PolySynth(BOARDSIZE * 2, Tone.SimpleFM).toMaster()
-
 synth.set('volume', -10)
 
 const nursery = [
@@ -390,7 +387,6 @@ function main({DOM, Keys, Animation}) {
 
   const update$ = Animation.pluck('delta')
     .withLatestFrom(keys$, (delta, keys) => update(delta/FRAMERATE, keys))
-
 
   const timescale$ = DOM
     .select('.timescale')
