@@ -167,13 +167,10 @@ function updateBoard(board, delta) {
 
 function update(delta, keysDown) {
   return function(state) {
-    return {
-      ...state,
+    state.board = updateBoard(state.board, delta)
+    state.gardener = updateGardener(state.gardener, delta, keysDown)
 
-      board: updateBoard(state.board, delta),
-
-      gardener: updateGardener(state.gardener, delta, keysDown)
-    }
+    return state
   }
 }
 
