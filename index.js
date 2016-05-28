@@ -11,16 +11,15 @@ import Tone from 'tone'
 import lodashMath from 'lodash-math';
 
 const FRAMERATE = 1000 / 60
-
 const BOARDSIZE = 20
-
+const PATCHSIZE = 30 //px
+const BOARDSIZE_IN_PX = BOARDSIZE * PATCHSIZE
 const PLANT_MATURITY_AGE = 3000 / FRAMERATE // msec
 
 const MAX_TIMESCALE = 250
 const MIN_TIMESCALE = 50
 
 const octave = "G A C D E G".split(" ");
-
 const synth = new Tone.PolySynth(BOARDSIZE * 2, Tone.SimpleFM).toMaster()
 synth.set('volume', -10)
 
@@ -42,9 +41,9 @@ function Board({rows, columns}) {
   )
 }
 
-function Gardener({position, id = uuid.v4()}) {
+function Gardener({position, velocity, id = uuid.v4()}) {
   return {
-    velocity: {x:0, y:0},
+    velocity,
     acceleration: 0.4,
     friction: .94,
     position,
@@ -141,14 +140,68 @@ function updateGardener(gardener, delta, keysDown) {
   return {
     ...gardener,
 
-    position: {
-      x: gardener.position.x + gardener.velocity.x * delta,
-      y: gardener.position.y + gardener.velocity.y * delta
-    },
+    position: calculatePosition(gardener, delta),
 
-    velocity: {
-      x: (gardener.velocity.x + accelerationChange.x * delta) * (gardener.friction / delta),
-      y: (gardener.velocity.y + accelerationChange.y * delta) * (gardener.friction / delta)
+    velocity: calculateVelocity(gardener, delta, accelerationChange)
+  }
+}
+
+function positionIsOnBoard ({row, column}) {
+  if (row < 0 || column < 0) {
+    return false;
+  }
+
+  if (row > BOARDSIZE - 1 || column > BOARDSIZE - 1) {
+    return false;
+  }
+
+  return true;
+}
+
+function calculateVelocity(gardener, delta, accelerationChange) {
+  const xVelocity = (gardener.velocity.x + accelerationChange.x * delta) * (gardener.friction / delta);
+  const yVelocity = (gardener.velocity.y + accelerationChange.y * delta) * (gardener.friction / delta);
+
+  return {
+    x: xVelocity,
+    y: yVelocity
+  }
+}
+
+function calculatePosition(gardener, delta) {
+  const xPosition = gardener.position.x + gardener.velocity.x * delta;
+  const yPosition = gardener.position.y + gardener.velocity.y * delta;
+  let row = xPosition / PATCHSIZE
+  let column = yPosition / PATCHSIZE
+
+  if (positionIsOnBoard({row, column})) {
+    return {
+        x: xPosition,
+        y: yPosition
+      }
+  } else {
+    let xWrapped = xPosition;
+    let yWrapped = yPosition;
+
+    if (xPosition > BOARDSIZE_IN_PX) {
+      xWrapped = xPosition - BOARDSIZE_IN_PX
+    }
+
+    if (xPosition < 0) {
+      xWrapped = xPosition + BOARDSIZE_IN_PX
+    }
+
+    if (yPosition > BOARDSIZE_IN_PX) {
+      yWrapped = yPosition - BOARDSIZE_IN_PX
+    }
+
+    if (yPosition < 0) {
+      yWrapped = yPosition + BOARDSIZE_IN_PX
+    }
+
+    return {
+      x: xWrapped,
+      y: yWrapped
     }
   }
 }
@@ -241,21 +294,6 @@ function pulse(state) {
 }
 
 function liveNeighbors(board, tile) {
-  function positionIsOnBoard ({row, column}) {
-    const boardSize = board.length; // trololololo better hope the board is square
-
-    if (row < 0 || column < 0) {
-      return false;
-    }
-
-    if (row > boardSize - 1 || column > boardSize - 1) {
-      return false;
-    }
-
-    return true;
-  }
-
-
   const potentialNeighbors = [
     {column: -1, row: -1}, //NW
     {column: 0, row: -1},  //N
@@ -277,19 +315,24 @@ function liveNeighbors(board, tile) {
 }
 
 function tileAtPosition(board, position) {
-  let row = Math.round(position.y / 30)
-  let column = Math.round(position.x / 30)
+  let row = Math.round(position.y / PATCHSIZE)
+  let column = Math.round(position.x / PATCHSIZE)
 
-  return board[row][column]
+ if (positionIsOnBoard({row, column})) {
+   return board[row][column];
+ }
+
 }
 
 function plant(state) {
   const tile = tileAtPosition(state.board, state.gardener.position)
 
-  tile.plant = true
-  tile.age = 0
-  tile.duration = selectedPlant(state).duration
-  tile.color = selectedPlant(state).color
+  if (tile) {
+    tile.plant = true
+    tile.age = 0
+    tile.duration = selectedPlant(state).duration
+    tile.color = selectedPlant(state).color
+  }
 
   return state
 }
@@ -373,7 +416,10 @@ function main({DOM, Keys, Animation}) {
 
   const initialState = {
     board: Board({rows: BOARDSIZE, columns: BOARDSIZE}),
-    gardener: Gardener({position: {x: 200, y: 150}}),
+    gardener: Gardener({
+      position: {x: 200, y: 150},
+      velocity: {x:0, y: 0}
+    }),
     nursery,
     selectedPlantIndex: 0
   }
