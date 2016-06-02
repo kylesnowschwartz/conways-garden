@@ -63,17 +63,27 @@ function Tile({row, column, plant = false, age = 0, duration = 1, id = uuid.v4()
   return {row, column, plant, duration, age, id, color}
 }
 
-function renderTile(tile, tileAtGardenerPosition) {
-  const classes = `.tile ${tile.plant ? '.plant' : '' } ${tileAtGardenerPosition ? '.outline' : '' }`
+function renderTile(tile, tileAtGardenerPosition, beat) {
+  let classes = `.tile ${tile.plant ? '.plant' : '' } ${tileAtGardenerPosition ? '.outline' : '' }`
 
   const style = {
     background: tile.color
   }
 
-  if (tile.plant && tile.age < PLANT_MATURITY_AGE) {
+  const mature = tile.age > PLANT_MATURITY_AGE;
+
+  if (tile.plant && !mature) {
     const borderThickness = 14 - (14 * tile.age / PLANT_MATURITY_AGE);
 
     style.border = `${borderThickness}px solid black`
+
+  }
+
+  if (tile.plant && mature) {
+    // TODO - make this better
+    if (beat % (1 / tile.duration * 8) === 0) {
+      classes += '.active';
+    }
   }
 
   return (
@@ -81,9 +91,9 @@ function renderTile(tile, tileAtGardenerPosition) {
   )
 }
 
-function renderRow(row, tileAtGardenerPosition) {
+function renderRow(row, tileAtGardenerPosition, beat) {
   return (
-    div('.row', row.map(tile => renderTile(tile, tile === tileAtGardenerPosition)))
+    div('.row', row.map(tile => renderTile(tile, tile === tileAtGardenerPosition, beat)))
   )
 }
 
@@ -99,12 +109,12 @@ function renderNursery(nursery, selectedPlantIndex) {
   )
 }
 
-function view({board, gardener, nursery, selectedPlantIndex}) {
+function view({board, gardener, nursery, selectedPlantIndex, beat}) {
   const tileAtGardenerPosition = tileAtPosition(board, gardener.position)
 
   return (
     div('.game', [
-      div('.board', board.map(row => renderRow(row, tileAtGardenerPosition))),
+      div('.board', board.map(row => renderRow(row, tileAtGardenerPosition, beat))),
       renderGardener(gardener),
 
       renderNursery(nursery, selectedPlantIndex),
@@ -357,6 +367,12 @@ function nextNurseryPlant (state) {
   }
 }
 
+function incrementBeat (state) {
+  state.beat += 1;
+
+  return state;
+}
+
 function main({DOM, Keys, Animation}) {
   function isDown(key) {
     const down$ = Keys.down(key)
@@ -392,8 +408,10 @@ function main({DOM, Keys, Animation}) {
     .startWith(150);
 
   const tick$ = timescale$.flatMapLatest(timescale => Observable.interval((MAX_TIMESCALE + MIN_TIMESCALE) - timescale))
-    .shareReplay()
-  
+    .shareReplay(1)
+
+  const incrementBeat$ = tick$.map(event => incrementBeat);
+
   const pulse$ = tick$
     .filter((i) => i % 8 === 0)
     .map(event => pulse)
@@ -411,10 +429,12 @@ function main({DOM, Keys, Animation}) {
     plant$,
     pulse$,
     previousNurseryPlant$,
-    nextNurseryPlant$
+    nextNurseryPlant$,
+    incrementBeat$
   )
 
   const initialState = {
+    beat: 0,
     board: Board({rows: BOARDSIZE, columns: BOARDSIZE}),
     gardener: Gardener({
       position: {x: 200, y: 150},
@@ -429,19 +449,21 @@ function main({DOM, Keys, Animation}) {
     .scan((state, action) => action(state))
     .shareReplay()
 
-  const wholeNotes$ = tick$
+  const beat$ = state$.pluck('beat').distinctUntilChanged().shareReplay();
+
+  const wholeNotes$ = beat$
     .filter((i) => i % 8 === 0)
     .withLatestFrom(state$, (__, state) => applyMusicRules(state, 1) )
 
-  const halfNotes$ = tick$
+  const halfNotes$ = beat$
     .filter((i) => i % 4 === 0)
     .withLatestFrom(state$, (__, state) => applyMusicRules(state, 2) )
 
-  const quarterNotes$ = tick$
+  const quarterNotes$ = beat$
     .filter((i) => i % 2 === 0)
     .withLatestFrom(state$, (__, state) => applyMusicRules(state, 4) )
 
-  const eightNotes$ = tick$
+  const eightNotes$ = beat$
     .withLatestFrom(state$, (__, state) => applyMusicRules(state, 8) )
 
   const notes$ = Observable.merge(
