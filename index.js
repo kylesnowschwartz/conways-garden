@@ -20,15 +20,40 @@ const MAX_TIMESCALE = 250
 const MIN_TIMESCALE = 50
 
 const octave = "G A C D E G".split(" ");
-const synth = new Tone.PolySynth(BOARDSIZE * 2, Tone.SimpleFM).toMaster()
+const synth = new Tone.PolySynth(BOARDSIZE, Tone.SimpleFM).toMaster()
 synth.set('volume', -10)
 
+const drum = new Tone.PolySynth(BOARDSIZE, Tone.DrumSynth).toMaster()
+drum.set('volume', -10)
+
+const instruments = {
+  synth,
+  drum
+};
+
 const nursery = [
-  {duration: 1, color: '#AD1457'},
-  {duration: 2, color: '#D81B60'},
-  {duration: 4, color: '#EC407A'},
-  {duration: 8, color: '#F48FB1'}
-]
+  {
+    plantName: 'Synths',
+    instrument: 'synth',
+    options: [
+      {duration: 1, color: '#AD1457'},
+      {duration: 2, color: '#D81B60'},
+      {duration: 4, color: '#EC407A'},
+      {duration: 8, color: '#F48FB1'}
+    ]
+  },
+
+  {
+    plantName: 'Drums',
+    instrument: 'drum',
+    options: [
+      {duration: 1, color: 'forestgreen'},
+      {duration: 2, color: 'lime'},
+      {duration: 4, color: 'lightgreen'},
+      {duration: 8, color: '#B8F5C0'}
+    ]
+  }
+];
 
 function Board({rows, columns}) {
   return (
@@ -45,22 +70,22 @@ function Gardener({position, velocity, id = uuid.v4()}) {
   return {
     velocity,
     acceleration: 0.4,
-    friction: .94,
+    friction: 0.94,
     position,
     id
   }
 }
 
 function renderGardener({id, position}) {
-  const style = {left: position.x + 'px', top: position.y + 'px'}
+  const style = {transform: `translate(${position.x}px, ${position.y}px)`}
 
   return (
     div('.gardener', {style, key: id})
   )
 }
 
-function Tile({row, column, plant = false, age = 0, duration = 1, id = uuid.v4(), color = 'black'}) {
-  return {row, column, plant, duration, age, id, color}
+function Tile({row, column, plant = false, age = 0, duration = 1, id = uuid.v4(), color = 'black', instrument = 'synth'}) {
+  return {row, column, plant, duration, age, id, color, instrument}
 }
 
 function renderTile(tile, tileAtGardenerPosition, beat) {
@@ -97,29 +122,43 @@ function renderRow(row, tileAtGardenerPosition, beat) {
   )
 }
 
-function renderNursery(nursery, selectedPlantIndex) {
+function renderNurseryRow(nurseryRow, selectedInstrument, selectedPlantIndex) {
   return (
-    div('.nursery', nursery.map((plant, index) =>
-      div(
-        `.nursery-slot ${index === selectedPlantIndex ? '.selected' : ''}`,
-        {style: {background: plant.color}},
-        `1/${plant.duration}`
-      )
-    ))
+    div('.nursery-row', [
+      nurseryRow.plantName,
+
+      nurseryRow.options.map((plant, index) =>
+        div(
+            `.nursery-slot ${index === selectedPlantIndex && selectedInstrument ? '.selected' : ''}`,
+            {style: {background: plant.color}},
+            `1/${plant.duration}`
+           )
+        )
+      ]
+    )
   )
 }
 
-function view({board, gardener, nursery, selectedPlantIndex, beat}) {
+function renderNursery(nursery, selectedInstrumentIndex, selectedPlantIndex) {
+  return (
+    div('.nursery', nursery.map((row, index) => renderNurseryRow(row, selectedInstrumentIndex === index, selectedPlantIndex)))
+  )
+}
+
+function view({board, gardener, nursery, selectedInstrumentIndex, selectedPlantIndex, beat}) {
   const tileAtGardenerPosition = tileAtPosition(board, gardener.position)
 
   return (
     div('.game', [
-      div('.board', board.map(row => renderRow(row, tileAtGardenerPosition, beat))),
       renderGardener(gardener),
+      div('.board', board.map(row => renderRow(row, tileAtGardenerPosition, beat))),
 
-      renderNursery(nursery, selectedPlantIndex),
+      renderNursery(nursery, selectedInstrumentIndex, selectedPlantIndex),
 
-      input('.timescale', {attributes: {type: 'range', min: MIN_TIMESCALE, max: MAX_TIMESCALE}}),
+      div('.timescale-container', [
+        'Timescale: ',
+        input('.timescale', {attributes: {type: 'range', min: MIN_TIMESCALE, max: MAX_TIMESCALE}}),
+      ])
     ])
   )
 }
@@ -255,8 +294,9 @@ function applyConwayRules(board) {
         if (liveNeighborsCount === 3) {
           const durationMode = mode(neighbors.map(neighbor => neighbor.duration));
           const color = mode(neighbors.map(neighbor => neighbor.color))
+          const instrument = mode(neighbors.map(neighbor => neighbor.instrument));
 
-          return Tile({...tile, plant: true, age: PLANT_MATURITY_AGE, duration: durationMode, color})
+          return Tile({...tile, plant: true, age: PLANT_MATURITY_AGE, duration: durationMode, color, instrument})
         } else {
           return tile
         }
@@ -290,8 +330,11 @@ function applyMusicRules(state, noteDuration) {
 function applyNote(tile) {
   if (tile.plant && tile.age >= PLANT_MATURITY_AGE) {
     const register = Math.floor(tile.column / 8 + 2);
-    
-    return octave[tile.row % octave.length] + register.toString();
+
+    const note = octave[tile.row % octave.length] + register.toString();
+    const instrument = tile.instrument;
+
+    return {note, instrument}
   }
 }
 
@@ -336,19 +379,27 @@ function tileAtPosition(board, position) {
 
 function plant(state) {
   const tile = tileAtPosition(state.board, state.gardener.position)
+    const currentSelectedPlant =  selectedPlant(state);
 
   if (tile) {
     tile.plant = true
     tile.age = 0
-    tile.duration = selectedPlant(state).duration
-    tile.color = selectedPlant(state).color
+    tile.duration = currentSelectedPlant.duration
+    tile.color = currentSelectedPlant.color
+    tile.instrument = currentSelectedPlant.instrument
   }
 
   return state
 }
 
 function selectedPlant(state) {
-  return state.nursery[state.selectedPlantIndex]
+  const selectedInstrument = state.nursery[state.selectedInstrumentIndex];
+  const plant = selectedInstrument.options[state.selectedPlantIndex]
+
+  return {
+    ...plant,
+    instrument: selectedInstrument.instrument
+  }
 }
 
 function previousNurseryPlant (state) {
@@ -363,7 +414,25 @@ function nextNurseryPlant (state) {
   return {
     ...state,
 
-    selectedPlantIndex: (state.selectedPlantIndex + 1) % nursery.length
+    selectedPlantIndex: (state.selectedPlantIndex + 1) % nursery[state.selectedInstrumentIndex].options.length
+  }
+}
+
+function previousNurseryInstrument (state) {
+  const instrumentsCount = state.nursery.length;
+
+  return {
+    ...state,
+
+    selectedInstrumentIndex: state.selectedInstrumentIndex === 0 ? instrumentsCount - 1 : state.selectedInstrumentIndex - 1
+  };
+}
+
+function nextNurseryInstrument (state) {
+  return {
+    ...state,
+
+    selectedInstrumentIndex: (state.selectedInstrumentIndex + 1) % nursery.length
   }
 }
 
@@ -424,12 +493,22 @@ function main({DOM, Keys, Animation}) {
     .down('right')
     .map(event => nextNurseryPlant);
 
+  const previousNurseryInstrument$ = Keys
+    .down('up')
+    .map(event => previousNurseryInstrument);
+
+  const nextNurseryInstrument$ = Keys
+    .down('down')
+    .map(event => nextNurseryInstrument);
+
   const action$ = Observable.merge(
     update$,
     plant$,
     pulse$,
     previousNurseryPlant$,
     nextNurseryPlant$,
+    previousNurseryInstrument$,
+    nextNurseryInstrument$,
     incrementBeat$
   )
 
@@ -441,6 +520,7 @@ function main({DOM, Keys, Animation}) {
       velocity: {x:0, y: 0}
     }),
     nursery,
+    selectedInstrumentIndex: 0,
     selectedPlantIndex: 0
   }
 
@@ -483,7 +563,16 @@ const drivers = {
   DOM: makeDOMDriver('.app'),
   Keys: makeKeysDriver(),
   Animation: makeAnimationDriver(),
-  Music: notes$ => notes$.subscribe(notes => synth.triggerAttackRelease(notes, "4n"))
+  Music: notes$ => notes$.subscribe(notes => {
+    const notesGroupedByInstrument = _.groupBy(notes, 'instrument');
+
+    for (let instrument in notesGroupedByInstrument) {
+      const notesToPlay = notesGroupedByInstrument[instrument]
+        .map(({note}) => note);
+
+      instruments[instrument].triggerAttackRelease(_.uniq(notesToPlay), '4n');
+    }
+  })
 }
 
 Cycle.run(main, drivers)
