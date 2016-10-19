@@ -22,5 +22,5 @@ Features
 - [x] a plant remains dormant for a time
 - [x] drum plants
 - [x] timescale slider
-- [ ] reset button
+- [x] reset button
 - [ ] custom synths

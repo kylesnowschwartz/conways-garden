@@ -8,8 +8,6 @@ import combineLatestObj from 'rx-combine-latest-obj'
 import uuid from 'node-uuid'
 import Tone from 'tone'
 
-import lodashMath from 'lodash-math';
-
 const FRAMERATE = 1000 / 60
 const BOARDSIZE = 20
 const PATCHSIZE = 30 //px
@@ -280,15 +278,6 @@ function updateBoard(board, delta) {
   )
 }
 
-function update(delta, keysDown) {
-  return function(state) {
-    state.board = updateBoard(state.board, delta)
-    state.gardener = updateGardener(state.gardener, delta, keysDown)
-
-    return state
-  }
-}
-
 // http://stackoverflow.com/a/20762713
 function mode(arr){
   return arr.sort((a,b) =>
@@ -351,14 +340,6 @@ function applyNote(tile) {
   }
 }
 
-function pulse(state) {
-  return {
-    ...state,
-    board: applyConwayRules(state.board)
-
-  }
-}
-
 function liveNeighbors(board, tile) {
   const potentialNeighbors = [
     {column: -1, row: -1}, //NW
@@ -380,32 +361,16 @@ function liveNeighbors(board, tile) {
     .filter(neighbor => neighbor.plant)
 }
 
-function tileAtPosition(board, position) {
+function tileAtPosition (board, position) {
   let row = Math.round(position.y / PATCHSIZE)
   let column = Math.round(position.x / PATCHSIZE)
 
  if (positionIsOnBoard({row, column})) {
    return board[row][column];
  }
-
 }
 
-function plant(state) {
-  const tile = tileAtPosition(state.board, state.gardener.position)
-    const currentSelectedPlant =  selectedPlant(state);
-
-  if (tile) {
-    tile.plant = true
-    tile.age = 0
-    tile.duration = currentSelectedPlant.duration
-    tile.color = currentSelectedPlant.color
-    tile.instrument = currentSelectedPlant.instrument
-  }
-
-  return state
-}
-
-function selectedPlant(state) {
+function selectedPlant (state) {
   const selectedInstrument = state.nursery[state.selectedInstrumentIndex];
   const plant = selectedInstrument.options[state.selectedPlantIndex]
 
@@ -415,48 +380,80 @@ function selectedPlant(state) {
   }
 }
 
-function previousNurseryPlant (state) {
-  return {
-    ...state,
+const reducers = {
+  UPDATE (state, action) {
+    state.board = updateBoard(state.board, action.delta)
+    state.gardener = updateGardener(state.gardener, action.delta, action.keys)
 
-    selectedPlantIndex: state.selectedPlantIndex === 0 ? 3 : state.selectedPlantIndex - 1
+    return state
+  },
+
+  PULSE (state, action) {
+    return {
+      ...state,
+      board: applyConwayRules(state.board)
+
+    }
+  },
+
+  PLANT (state, action) {
+    const tile = tileAtPosition(state.board, state.gardener.position)
+      const currentSelectedPlant =  selectedPlant(state, action);
+
+    if (tile) {
+      tile.plant = true
+      tile.age = 0
+      tile.duration = currentSelectedPlant.duration
+      tile.color = currentSelectedPlant.color
+      tile.instrument = currentSelectedPlant.instrument
+    }
+
+    return state
+  },
+
+  PREVIOUS_NURSERY_PLANT (state, action) {
+    return {
+      ...state,
+
+      selectedPlantIndex: state.selectedPlantIndex === 0 ? 3 : state.selectedPlantIndex - 1
+    }
+  },
+
+  NEXT_NURSERY_PLANT (state, action) {
+    return {
+      ...state,
+
+      selectedPlantIndex: (state.selectedPlantIndex + 1) % nursery[state.selectedInstrumentIndex].options.length
+    }
+  },
+
+  PREVIOUS_NURSERY_INSTRUMENT (state, action) {
+    const instrumentsCount = state.nursery.length;
+
+    return {
+      ...state,
+
+      selectedInstrumentIndex: state.selectedInstrumentIndex === 0 ? instrumentsCount - 1 : state.selectedInstrumentIndex - 1
+    };
+  },
+
+  NEXT_NURSERY_INSTRUMENT (state, action) {
+    return {
+      ...state,
+
+      selectedInstrumentIndex: (state.selectedInstrumentIndex + 1) % nursery.length
+    }
+  },
+
+  INCREMENT_BEAT (state, action) {
+    state.beat += 1;
+
+    return state;
+  },
+
+  RESET (state, action) {
+    return initialState();
   }
-}
-
-function nextNurseryPlant (state) {
-  return {
-    ...state,
-
-    selectedPlantIndex: (state.selectedPlantIndex + 1) % nursery[state.selectedInstrumentIndex].options.length
-  }
-}
-
-function previousNurseryInstrument (state) {
-  const instrumentsCount = state.nursery.length;
-
-  return {
-    ...state,
-
-    selectedInstrumentIndex: state.selectedInstrumentIndex === 0 ? instrumentsCount - 1 : state.selectedInstrumentIndex - 1
-  };
-}
-
-function nextNurseryInstrument (state) {
-  return {
-    ...state,
-
-    selectedInstrumentIndex: (state.selectedInstrumentIndex + 1) % nursery.length
-  }
-}
-
-function incrementBeat (state) {
-  state.beat += 1;
-
-  return state;
-}
-
-function reset (state) {
-  return initialState();
 }
 
 function main({DOM, Keys, Animation}) {
@@ -480,12 +477,7 @@ function main({DOM, Keys, Animation}) {
     D$: isDown('D')
   })
 
-  const plant$ = Keys.down('space')
-    .do(event => event.preventDefault())
-    .map(event => plant)
-
-  const update$ = Animation.pluck('delta')
-    .withLatestFrom(keys$, (delta, keys) => update(delta/FRAMERATE, keys))
+  // NON ACTIONS
 
   const timescale$ = DOM
     .select('.timescale')
@@ -496,48 +488,65 @@ function main({DOM, Keys, Animation}) {
   const tick$ = timescale$.flatMapLatest(timescale => Observable.interval((MAX_TIMESCALE + MIN_TIMESCALE) - timescale))
     .shareReplay(1)
 
-  const incrementBeat$ = tick$.map(event => incrementBeat);
+  // ACTIONS
 
-  const pulse$ = tick$
+  const plantAction$ = Keys.down('space')
+    .do(event => event.preventDefault())
+    .map(event => ({type: 'PLANT'}))
+
+  const updateAction$ = Animation.pluck('delta')
+    .withLatestFrom(keys$, (delta, keys) => ({type: 'UPDATE', delta: delta/FRAMERATE, keys}))
+
+  const incrementBeatAction$ = tick$.map(event => ({type: 'INCREMENT_BEAT'}));
+
+  const pulseAction$ = tick$
     .filter((i) => i % 8 === 0)
-    .map(event => pulse)
+    .map(event => ({type: 'PULSE'}))
 
-  const previousNurseryPlant$ = Keys
+  const previousNurseryPlantAction$ = Keys
     .down('left')
-    .map(event => previousNurseryPlant);
+    .map(event => ({type: 'PREVIOUS_NURSERY_PLANT'}));
 
-  const nextNurseryPlant$ = Keys
+  const nextNurseryPlantAction$ = Keys
     .down('right')
-    .map(event => nextNurseryPlant);
+    .map(event => ({type: 'NEXT_NURSERY_PLANT'}));
 
-  const previousNurseryInstrument$ = Keys
+  const previousNurseryInstrumentAction$ = Keys
     .down('up')
-    .map(event => previousNurseryInstrument);
+    .map(event => ({type: 'PREVIOUS_NURSERY'}));
 
-  const nextNurseryInstrument$ = Keys
+  const nextNurseryInstrumentAction$ = Keys
     .down('down')
-    .map(event => nextNurseryInstrument);
+    .map(event => ({type: 'NEXT_NURSERY'}));
 
-  const reset$ = DOM
+  const resetAction$ = DOM
     .select('.reset')
     .events('click')
-    .map(event => reset)
+    .map(event => ({type: 'RESET'}))
 
   const action$ = Observable.merge(
-    update$,
-    plant$,
-    pulse$,
-    previousNurseryPlant$,
-    nextNurseryPlant$,
-    previousNurseryInstrument$,
-    nextNurseryInstrument$,
-    incrementBeat$,
-    reset$
+    updateAction$,
+    plantAction$,
+    pulseAction$,
+    previousNurseryPlantAction$,
+    nextNurseryPlantAction$,
+    previousNurseryInstrumentAction$,
+    nextNurseryInstrumentAction$,
+    incrementBeatAction$,
+    resetAction$
   )
 
   const state$ = action$
     .startWith(initialState())
-    .scan((state, action) => action(state))
+    .scan((state, action) => {
+      const reducer = reducers[action.type]
+
+      if (!reducer) {
+        throw new Error(`No such reducer for action: ${JSON.stringify(action.type)}`)
+      };
+
+      return reducer(state, action)
+    })
     .shareReplay()
 
   const beat$ = state$.pluck('beat').distinctUntilChanged().shareReplay();
