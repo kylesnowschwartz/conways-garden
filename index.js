@@ -150,7 +150,6 @@ function view({board, gardener, nursery, selectedInstrumentIndex, selectedPlantI
 
   return (
     div('.game', [
-      renderGardener(gardener),
       div('.board', board.map(row => renderRow(row, tileAtGardenerPosition, beat))),
 
       renderNursery(nursery, selectedInstrumentIndex, selectedPlantIndex),
@@ -517,7 +516,7 @@ function main({DOM, Keys, Animation}) {
     board: Board({rows: BOARDSIZE, columns: BOARDSIZE}),
     gardener: Gardener({
       position: {x: 200, y: 150},
-      velocity: {x:0, y: 0}
+      velocity: {x: 0, y: 0}
     }),
     nursery,
     selectedInstrumentIndex: 0,
