@@ -38,17 +38,35 @@ var _lodashMath2 = _interopRequireDefault(_lodashMath);
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 var FRAMERATE = 1000 / 60;
-
 var BOARDSIZE = 20;
-
+var PATCHSIZE = 30; //px
+var BOARDSIZE_IN_PX = BOARDSIZE * PATCHSIZE;
 var PLANT_MATURITY_AGE = 3000 / FRAMERATE; // msec
 
-var octave = "G A C D E G".split(" ");
+var MAX_TIMESCALE = 250;
+var MIN_TIMESCALE = 50;
 
-var synth = new _tone2.default.PolySynth(BOARDSIZE * 2, _tone2.default.SimpleFM).toMaster();
+var octave = "G A C D E G".split(" ");
+var synth = new _tone2.default.PolySynth(BOARDSIZE, _tone2.default.SimpleFM).toMaster();
 synth.set('volume', -10);
 
-var nursery = [{ duration: 1, color: '#AD1457' }, { duration: 2, color: '#D81B60' }, { duration: 4, color: '#EC407A' }, { duration: 8, color: '#F48FB1' }];
+var drum = new _tone2.default.PolySynth(BOARDSIZE, _tone2.default.DrumSynth).toMaster();
+drum.set('volume', -10);
+
+var instruments = {
+  synth: synth,
+  drum: drum
+};
+
+var nursery = [{
+  plantName: 'Synths',
+  instrument: 'synth',
+  options: [{ duration: 1, color: '#AD1457' }, { duration: 2, color: '#D81B60' }, { duration: 4, color: '#EC407A' }, { duration: 8, color: '#F48FB1' }]
+}, {
+  plantName: 'Drums',
+  instrument: 'drum',
+  options: [{ duration: 1, color: 'forestgreen' }, { duration: 2, color: 'lime' }, { duration: 4, color: 'lightgreen' }, { duration: 8, color: '#B8F5C0' }]
+}];
 
 function Board(_ref) {
   var rows = _ref.rows;
@@ -66,13 +84,14 @@ function Board(_ref) {
 
 function Gardener(_ref2) {
   var position = _ref2.position;
+  var velocity = _ref2.velocity;
   var _ref2$id = _ref2.id;
   var id = _ref2$id === undefined ? _nodeUuid2.default.v4() : _ref2$id;
 
   return {
-    velocity: { x: 0, y: 0 },
+    velocity: velocity,
     acceleration: 0.4,
-    friction: .94,
+    friction: 0.94,
     position: position,
     id: id
   };
@@ -82,7 +101,7 @@ function renderGardener(_ref3) {
   var id = _ref3.id;
   var position = _ref3.position;
 
-  var style = { left: position.x + 'px', top: position.y + 'px' };
+  var style = { transform: 'translate(' + position.x + 'px, ' + position.y + 'px)' };
 
   return (0, _dom.div)('.gardener', { style: style, key: id });
 }
@@ -100,35 +119,52 @@ function Tile(_ref4) {
   var id = _ref4$id === undefined ? _nodeUuid2.default.v4() : _ref4$id;
   var _ref4$color = _ref4.color;
   var color = _ref4$color === undefined ? 'black' : _ref4$color;
+  var _ref4$instrument = _ref4.instrument;
+  var instrument = _ref4$instrument === undefined ? 'synth' : _ref4$instrument;
 
-  return { row: row, column: column, plant: plant, duration: duration, age: age, id: id, color: color };
+  return { row: row, column: column, plant: plant, duration: duration, age: age, id: id, color: color, instrument: instrument };
 }
 
-function renderTile(tile, tileAtGardenerPosition) {
+function renderTile(tile, tileAtGardenerPosition, beat) {
   var classes = '.tile ' + (tile.plant ? '.plant' : '') + ' ' + (tileAtGardenerPosition ? '.outline' : '');
 
   var style = {
     background: tile.color
   };
 
-  if (tile.plant && tile.age < PLANT_MATURITY_AGE) {
+  var mature = tile.age > PLANT_MATURITY_AGE;
+
+  if (tile.plant && !mature) {
     var borderThickness = 14 - 14 * tile.age / PLANT_MATURITY_AGE;
 
     style.border = borderThickness + 'px solid black';
   }
 
+  if (tile.plant && mature) {
+    // TODO - make this better
+    if (beat % (1 / tile.duration * 8) === 0) {
+      classes += '.active';
+    }
+  }
+
   return (0, _dom.div)(classes, { key: tile.id, style: style });
 }
 
-function renderRow(row, tileAtGardenerPosition) {
+function renderRow(row, tileAtGardenerPosition, beat) {
   return (0, _dom.div)('.row', row.map(function (tile) {
-    return renderTile(tile, tile === tileAtGardenerPosition);
+    return renderTile(tile, tile === tileAtGardenerPosition, beat);
   }));
 }
 
-function renderNursery(nursery, selectedPlantIndex) {
-  return (0, _dom.div)('.nursery', nursery.map(function (plant, index) {
-    return (0, _dom.div)('.nursery-slot ' + (index === selectedPlantIndex ? '.selected' : ''), { style: { background: plant.color } }, '1/' + plant.duration);
+function renderNurseryRow(nurseryRow, selectedInstrument, selectedPlantIndex) {
+  return (0, _dom.div)('.nursery-row', [nurseryRow.plantName, nurseryRow.options.map(function (plant, index) {
+    return (0, _dom.div)('.nursery-slot ' + (index === selectedPlantIndex && selectedInstrument ? '.selected' : ''), { style: { background: plant.color } }, '1/' + plant.duration);
+  })]);
+}
+
+function renderNursery(nursery, selectedInstrumentIndex, selectedPlantIndex) {
+  return (0, _dom.div)('.nursery', nursery.map(function (row, index) {
+    return renderNurseryRow(row, selectedInstrumentIndex === index, selectedPlantIndex);
   }));
 }
 
@@ -136,13 +172,15 @@ function view(_ref5) {
   var board = _ref5.board;
   var gardener = _ref5.gardener;
   var nursery = _ref5.nursery;
+  var selectedInstrumentIndex = _ref5.selectedInstrumentIndex;
   var selectedPlantIndex = _ref5.selectedPlantIndex;
+  var beat = _ref5.beat;
 
   var tileAtGardenerPosition = tileAtPosition(board, gardener.position);
 
-  return (0, _dom.div)('.game', [(0, _dom.div)('.board', board.map(function (row) {
-    return renderRow(row, tileAtGardenerPosition);
-  })), renderGardener(gardener), renderNursery(nursery, selectedPlantIndex)]);
+  return (0, _dom.div)('.game', [renderGardener(gardener), (0, _dom.div)('.board', board.map(function (row) {
+    return renderRow(row, tileAtGardenerPosition, beat);
+  })), renderNursery(nursery, selectedInstrumentIndex, selectedPlantIndex), (0, _dom.div)('.timescale-container', ['Timescale: ', (0, _dom.input)('.timescale', { attributes: { type: 'range', min: MIN_TIMESCALE, max: MAX_TIMESCALE } })])]);
 }
 
 function updateGardener(gardener, delta, keysDown) {
@@ -170,16 +208,73 @@ function updateGardener(gardener, delta, keysDown) {
 
   return _extends({}, gardener, {
 
-    position: {
-      x: gardener.position.x + gardener.velocity.x * delta,
-      y: gardener.position.y + gardener.velocity.y * delta
-    },
+    position: calculatePosition(gardener, delta),
 
-    velocity: {
-      x: (gardener.velocity.x + accelerationChange.x * delta) * (gardener.friction / delta),
-      y: (gardener.velocity.y + accelerationChange.y * delta) * (gardener.friction / delta)
-    }
+    velocity: calculateVelocity(gardener, delta, accelerationChange)
   });
+}
+
+function positionIsOnBoard(_ref6) {
+  var row = _ref6.row;
+  var column = _ref6.column;
+
+  if (row < 0 || column < 0) {
+    return false;
+  }
+
+  if (row > BOARDSIZE - 1 || column > BOARDSIZE - 1) {
+    return false;
+  }
+
+  return true;
+}
+
+function calculateVelocity(gardener, delta, accelerationChange) {
+  var xVelocity = (gardener.velocity.x + accelerationChange.x * delta) * (gardener.friction / delta);
+  var yVelocity = (gardener.velocity.y + accelerationChange.y * delta) * (gardener.friction / delta);
+
+  return {
+    x: xVelocity,
+    y: yVelocity
+  };
+}
+
+function calculatePosition(gardener, delta) {
+  var xPosition = gardener.position.x + gardener.velocity.x * delta;
+  var yPosition = gardener.position.y + gardener.velocity.y * delta;
+  var row = xPosition / PATCHSIZE;
+  var column = yPosition / PATCHSIZE;
+
+  if (positionIsOnBoard({ row: row, column: column })) {
+    return {
+      x: xPosition,
+      y: yPosition
+    };
+  } else {
+    var xWrapped = xPosition;
+    var yWrapped = yPosition;
+
+    if (xPosition > BOARDSIZE_IN_PX) {
+      xWrapped = xPosition - BOARDSIZE_IN_PX;
+    }
+
+    if (xPosition < 0) {
+      xWrapped = xPosition + BOARDSIZE_IN_PX;
+    }
+
+    if (yPosition > BOARDSIZE_IN_PX) {
+      yWrapped = yPosition - BOARDSIZE_IN_PX;
+    }
+
+    if (yPosition < 0) {
+      yWrapped = yPosition + BOARDSIZE_IN_PX;
+    }
+
+    return {
+      x: xWrapped,
+      y: yWrapped
+    };
+  }
 }
 
 function updateBoard(board, delta) {
@@ -196,12 +291,10 @@ function updateBoard(board, delta) {
 
 function update(delta, keysDown) {
   return function (state) {
-    return _extends({}, state, {
+    state.board = updateBoard(state.board, delta);
+    state.gardener = updateGardener(state.gardener, delta, keysDown);
 
-      board: updateBoard(state.board, delta),
-
-      gardener: updateGardener(state.gardener, delta, keysDown)
-    });
+    return state;
   };
 }
 
@@ -230,8 +323,11 @@ function applyConwayRules(board) {
           var color = mode(neighbors.map(function (neighbor) {
             return neighbor.color;
           }));
+          var instrument = mode(neighbors.map(function (neighbor) {
+            return neighbor.instrument;
+          }));
 
-          return Tile(_extends({}, tile, { plant: true, age: PLANT_MATURITY_AGE, duration: durationMode, color: color }));
+          return Tile(_extends({}, tile, { plant: true, age: PLANT_MATURITY_AGE, duration: durationMode, color: color, instrument: instrument }));
         } else {
           return tile;
         }
@@ -268,7 +364,10 @@ function applyNote(tile) {
   if (tile.plant && tile.age >= PLANT_MATURITY_AGE) {
     var register = Math.floor(tile.column / 8 + 2);
 
-    return octave[tile.row % octave.length] + register.toString();
+    var note = octave[tile.row % octave.length] + register.toString();
+    var instrument = tile.instrument;
+
+    return { note: note, instrument: instrument };
   }
 }
 
@@ -280,23 +379,6 @@ function pulse(state) {
 }
 
 function liveNeighbors(board, tile) {
-  function positionIsOnBoard(_ref6) {
-    var row = _ref6.row;
-    var column = _ref6.column;
-
-    var boardSize = board.length; // trololololo better hope the board is square
-
-    if (row < 0 || column < 0) {
-      return false;
-    }
-
-    if (row > boardSize - 1 || column > boardSize - 1) {
-      return false;
-    }
-
-    return true;
-  }
-
   var potentialNeighbors = [{ column: -1, row: -1 }, //NW
   { column: 0, row: -1 }, //N
   { column: 1, row: -1 }, //NE
@@ -321,25 +403,36 @@ function liveNeighbors(board, tile) {
 }
 
 function tileAtPosition(board, position) {
-  var row = Math.round(position.y / 30);
-  var column = Math.round(position.x / 30);
+  var row = Math.round(position.y / PATCHSIZE);
+  var column = Math.round(position.x / PATCHSIZE);
 
-  return board[row][column];
+  if (positionIsOnBoard({ row: row, column: column })) {
+    return board[row][column];
+  }
 }
 
 function plant(state) {
   var tile = tileAtPosition(state.board, state.gardener.position);
+  var currentSelectedPlant = selectedPlant(state);
 
-  tile.plant = true;
-  tile.age = 0;
-  tile.duration = selectedPlant(state).duration;
-  tile.color = selectedPlant(state).color;
+  if (tile) {
+    tile.plant = true;
+    tile.age = 0;
+    tile.duration = currentSelectedPlant.duration;
+    tile.color = currentSelectedPlant.color;
+    tile.instrument = currentSelectedPlant.instrument;
+  }
 
   return state;
 }
 
 function selectedPlant(state) {
-  return state.nursery[state.selectedPlantIndex];
+  var selectedInstrument = state.nursery[state.selectedInstrumentIndex];
+  var plant = selectedInstrument.options[state.selectedPlantIndex];
+
+  return _extends({}, plant, {
+    instrument: selectedInstrument.instrument
+  });
 }
 
 function previousNurseryPlant(state) {
@@ -352,8 +445,30 @@ function previousNurseryPlant(state) {
 function nextNurseryPlant(state) {
   return _extends({}, state, {
 
-    selectedPlantIndex: (state.selectedPlantIndex + 1) % nursery.length
+    selectedPlantIndex: (state.selectedPlantIndex + 1) % nursery[state.selectedInstrumentIndex].options.length
   });
+}
+
+function previousNurseryInstrument(state) {
+  var instrumentsCount = state.nursery.length;
+
+  return _extends({}, state, {
+
+    selectedInstrumentIndex: state.selectedInstrumentIndex === 0 ? instrumentsCount - 1 : state.selectedInstrumentIndex - 1
+  });
+}
+
+function nextNurseryInstrument(state) {
+  return _extends({}, state, {
+
+    selectedInstrumentIndex: (state.selectedInstrumentIndex + 1) % nursery.length
+  });
+}
+
+function incrementBeat(state) {
+  state.beat += 1;
+
+  return state;
 }
 
 function main(_ref8) {
@@ -390,7 +505,17 @@ function main(_ref8) {
     return update(delta / FRAMERATE, keys);
   });
 
-  var tick$ = _rx.Observable.interval(50).shareReplay();
+  var timescale$ = DOM.select('.timescale').events('change').map(function (event) {
+    return event.target.value;
+  }).startWith(150);
+
+  var tick$ = timescale$.flatMapLatest(function (timescale) {
+    return _rx.Observable.interval(MAX_TIMESCALE + MIN_TIMESCALE - timescale);
+  }).shareReplay(1);
+
+  var incrementBeat$ = tick$.map(function (event) {
+    return incrementBeat;
+  });
 
   var pulse$ = tick$.filter(function (i) {
     return i % 8 === 0;
@@ -406,12 +531,25 @@ function main(_ref8) {
     return nextNurseryPlant;
   });
 
-  var action$ = _rx.Observable.merge(update$, plant$, pulse$, previousNurseryPlant$, nextNurseryPlant$);
+  var previousNurseryInstrument$ = Keys.down('up').map(function (event) {
+    return previousNurseryInstrument;
+  });
+
+  var nextNurseryInstrument$ = Keys.down('down').map(function (event) {
+    return nextNurseryInstrument;
+  });
+
+  var action$ = _rx.Observable.merge(update$, plant$, pulse$, previousNurseryPlant$, nextNurseryPlant$, previousNurseryInstrument$, nextNurseryInstrument$, incrementBeat$);
 
   var initialState = {
+    beat: 0,
     board: Board({ rows: BOARDSIZE, columns: BOARDSIZE }),
-    gardener: Gardener({ position: { x: 200, y: 150 } }),
+    gardener: Gardener({
+      position: { x: 200, y: 150 },
+      velocity: { x: 0, y: 0 }
+    }),
     nursery: nursery,
+    selectedInstrumentIndex: 0,
     selectedPlantIndex: 0
   };
 
@@ -419,25 +557,27 @@ function main(_ref8) {
     return action(state);
   }).shareReplay();
 
-  var wholeNotes$ = tick$.filter(function (i) {
+  var beat$ = state$.pluck('beat').distinctUntilChanged().shareReplay();
+
+  var wholeNotes$ = beat$.filter(function (i) {
     return i % 8 === 0;
   }).withLatestFrom(state$, function (__, state) {
     return applyMusicRules(state, 1);
   });
 
-  var halfNotes$ = tick$.filter(function (i) {
+  var halfNotes$ = beat$.filter(function (i) {
     return i % 4 === 0;
   }).withLatestFrom(state$, function (__, state) {
     return applyMusicRules(state, 2);
   });
 
-  var quarterNotes$ = tick$.filter(function (i) {
+  var quarterNotes$ = beat$.filter(function (i) {
     return i % 2 === 0;
   }).withLatestFrom(state$, function (__, state) {
     return applyMusicRules(state, 4);
   });
 
-  var eightNotes$ = tick$.withLatestFrom(state$, function (__, state) {
+  var eightNotes$ = beat$.withLatestFrom(state$, function (__, state) {
     return applyMusicRules(state, 8);
   });
 
@@ -455,7 +595,16 @@ var drivers = {
   Animation: (0, _cycleAnimationDriver.makeAnimationDriver)(),
   Music: function Music(notes$) {
     return notes$.subscribe(function (notes) {
-      return synth.triggerAttackRelease(notes, "4n");
+      var notesGroupedByInstrument = _lodash2.default.groupBy(notes, 'instrument');
+
+      for (var instrument in notesGroupedByInstrument) {
+        var notesToPlay = notesGroupedByInstrument[instrument].map(function (_ref9) {
+          var note = _ref9.note;
+          return note;
+        });
+
+        instruments[instrument].triggerAttackRelease(_lodash2.default.uniq(notesToPlay), '4n');
+      }
     });
   }
 };

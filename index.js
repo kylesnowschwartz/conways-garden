@@ -1,5 +1,5 @@
 import Cycle from '@cycle/core'
-import {makeDOMDriver, div, button} from '@cycle/dom'
+import {makeDOMDriver, div, button, input} from '@cycle/dom'
 import {Observable} from 'rx'
 import _ from 'lodash'
 import {makeKeysDriver} from 'cycle-keys'
@@ -11,22 +11,49 @@ import Tone from 'tone'
 import lodashMath from 'lodash-math';
 
 const FRAMERATE = 1000 / 60
-
 const BOARDSIZE = 20
-
+const PATCHSIZE = 30 //px
+const BOARDSIZE_IN_PX = BOARDSIZE * PATCHSIZE
 const PLANT_MATURITY_AGE = 3000 / FRAMERATE // msec
 
-const octave = "G A C D E G".split(" ");
+const MAX_TIMESCALE = 250
+const MIN_TIMESCALE = 50
 
-const synth = new Tone.PolySynth(BOARDSIZE * 2, Tone.SimpleFM).toMaster()
+const octave = "G A C D E G".split(" ");
+const synth = new Tone.PolySynth(BOARDSIZE, Tone.SimpleFM).toMaster()
 synth.set('volume', -10)
 
+const drum = new Tone.PolySynth(BOARDSIZE, Tone.DrumSynth).toMaster()
+drum.set('volume', -10)
+
+const instruments = {
+  synth,
+  drum
+};
+
 const nursery = [
-  {duration: 1, color: '#AD1457'},
-  {duration: 2, color: '#D81B60'},
-  {duration: 4, color: '#EC407A'},
-  {duration: 8, color: '#F48FB1'}
-]
+  {
+    plantName: 'Synths',
+    instrument: 'synth',
+    options: [
+      {duration: 1, color: '#AD1457'},
+      {duration: 2, color: '#D81B60'},
+      {duration: 4, color: '#EC407A'},
+      {duration: 8, color: '#F48FB1'}
+    ]
+  },
+
+  {
+    plantName: 'Drums',
+    instrument: 'drum',
+    options: [
+      {duration: 1, color: 'forestgreen'},
+      {duration: 2, color: 'lime'},
+      {duration: 4, color: 'lightgreen'},
+      {duration: 8, color: '#B8F5C0'}
+    ]
+  }
+];
 
 function Board({rows, columns}) {
   return (
@@ -39,39 +66,49 @@ function Board({rows, columns}) {
   )
 }
 
-function Gardener({position, id = uuid.v4()}) {
+function Gardener({position, velocity, id = uuid.v4()}) {
   return {
-    velocity: {x:0, y:0},
+    velocity,
     acceleration: 0.4,
-    friction: .94,
+    friction: 0.94,
     position,
     id
   }
 }
 
 function renderGardener({id, position}) {
-  const style = {left: position.x + 'px', top: position.y + 'px'}
+  const style = {transform: `translate(${position.x}px, ${position.y}px)`}
 
   return (
     div('.gardener', {style, key: id})
   )
 }
 
-function Tile({row, column, plant = false, age = 0, duration = 1, id = uuid.v4(), color = 'black'}) {
-  return {row, column, plant, duration, age, id, color}
+function Tile({row, column, plant = false, age = 0, duration = 1, id = uuid.v4(), color = 'black', instrument = 'synth'}) {
+  return {row, column, plant, duration, age, id, color, instrument}
 }
 
-function renderTile(tile, tileAtGardenerPosition) {
-  const classes = `.tile ${tile.plant ? '.plant' : '' } ${tileAtGardenerPosition ? '.outline' : '' }`
+function renderTile(tile, tileAtGardenerPosition, beat) {
+  let classes = `.tile ${tile.plant ? '.plant' : '' } ${tileAtGardenerPosition ? '.outline' : '' }`
 
   const style = {
     background: tile.color
   }
 
-  if (tile.plant && tile.age < PLANT_MATURITY_AGE) {
+  const mature = tile.age > PLANT_MATURITY_AGE;
+
+  if (tile.plant && !mature) {
     const borderThickness = 14 - (14 * tile.age / PLANT_MATURITY_AGE);
 
     style.border = `${borderThickness}px solid black`
+
+  }
+
+  if (tile.plant && mature) {
+    // TODO - make this better
+    if (beat % (1 / tile.duration * 8) === 0) {
+      classes += '.active';
+    }
   }
 
   return (
@@ -79,33 +116,49 @@ function renderTile(tile, tileAtGardenerPosition) {
   )
 }
 
-function renderRow(row, tileAtGardenerPosition) {
+function renderRow(row, tileAtGardenerPosition, beat) {
   return (
-    div('.row', row.map(tile => renderTile(tile, tile === tileAtGardenerPosition)))
+    div('.row', row.map(tile => renderTile(tile, tile === tileAtGardenerPosition, beat)))
   )
 }
 
-function renderNursery(nursery, selectedPlantIndex) {
+function renderNurseryRow(nurseryRow, selectedInstrument, selectedPlantIndex) {
   return (
-    div('.nursery', nursery.map((plant, index) =>
-      div(
-        `.nursery-slot ${index === selectedPlantIndex ? '.selected' : ''}`,
-        {style: {background: plant.color}},
-        `1/${plant.duration}`
-      )
-    ))
+    div('.nursery-row', [
+      nurseryRow.plantName,
+
+      nurseryRow.options.map((plant, index) =>
+        div(
+            `.nursery-slot ${index === selectedPlantIndex && selectedInstrument ? '.selected' : ''}`,
+            {style: {background: plant.color}},
+            `1/${plant.duration}`
+           )
+        )
+      ]
+    )
   )
 }
 
-function view({board, gardener, nursery, selectedPlantIndex}) {
+function renderNursery(nursery, selectedInstrumentIndex, selectedPlantIndex) {
+  return (
+    div('.nursery', nursery.map((row, index) => renderNurseryRow(row, selectedInstrumentIndex === index, selectedPlantIndex)))
+  )
+}
+
+function view({board, gardener, nursery, selectedInstrumentIndex, selectedPlantIndex, beat}) {
   const tileAtGardenerPosition = tileAtPosition(board, gardener.position)
 
   return (
     div('.game', [
-      div('.board', board.map(row => renderRow(row, tileAtGardenerPosition))),
       renderGardener(gardener),
+      div('.board', board.map(row => renderRow(row, tileAtGardenerPosition, beat))),
 
-      renderNursery(nursery, selectedPlantIndex)
+      renderNursery(nursery, selectedInstrumentIndex, selectedPlantIndex),
+
+      div('.timescale-container', [
+        'Timescale: ',
+        input('.timescale', {attributes: {type: 'range', min: MIN_TIMESCALE, max: MAX_TIMESCALE}}),
+      ])
     ])
   )
 }
@@ -136,14 +189,68 @@ function updateGardener(gardener, delta, keysDown) {
   return {
     ...gardener,
 
-    position: {
-      x: gardener.position.x + gardener.velocity.x * delta,
-      y: gardener.position.y + gardener.velocity.y * delta
-    },
+    position: calculatePosition(gardener, delta),
 
-    velocity: {
-      x: (gardener.velocity.x + accelerationChange.x * delta) * (gardener.friction / delta),
-      y: (gardener.velocity.y + accelerationChange.y * delta) * (gardener.friction / delta)
+    velocity: calculateVelocity(gardener, delta, accelerationChange)
+  }
+}
+
+function positionIsOnBoard ({row, column}) {
+  if (row < 0 || column < 0) {
+    return false;
+  }
+
+  if (row > BOARDSIZE - 1 || column > BOARDSIZE - 1) {
+    return false;
+  }
+
+  return true;
+}
+
+function calculateVelocity(gardener, delta, accelerationChange) {
+  const xVelocity = (gardener.velocity.x + accelerationChange.x * delta) * (gardener.friction / delta);
+  const yVelocity = (gardener.velocity.y + accelerationChange.y * delta) * (gardener.friction / delta);
+
+  return {
+    x: xVelocity,
+    y: yVelocity
+  }
+}
+
+function calculatePosition(gardener, delta) {
+  const xPosition = gardener.position.x + gardener.velocity.x * delta;
+  const yPosition = gardener.position.y + gardener.velocity.y * delta;
+  let row = xPosition / PATCHSIZE
+  let column = yPosition / PATCHSIZE
+
+  if (positionIsOnBoard({row, column})) {
+    return {
+        x: xPosition,
+        y: yPosition
+      }
+  } else {
+    let xWrapped = xPosition;
+    let yWrapped = yPosition;
+
+    if (xPosition > BOARDSIZE_IN_PX) {
+      xWrapped = xPosition - BOARDSIZE_IN_PX
+    }
+
+    if (xPosition < 0) {
+      xWrapped = xPosition + BOARDSIZE_IN_PX
+    }
+
+    if (yPosition > BOARDSIZE_IN_PX) {
+      yWrapped = yPosition - BOARDSIZE_IN_PX
+    }
+
+    if (yPosition < 0) {
+      yWrapped = yPosition + BOARDSIZE_IN_PX
+    }
+
+    return {
+      x: xWrapped,
+      y: yWrapped
     }
   }
 }
@@ -162,13 +269,10 @@ function updateBoard(board, delta) {
 
 function update(delta, keysDown) {
   return function(state) {
-    return {
-      ...state,
+    state.board = updateBoard(state.board, delta)
+    state.gardener = updateGardener(state.gardener, delta, keysDown)
 
-      board: updateBoard(state.board, delta),
-
-      gardener: updateGardener(state.gardener, delta, keysDown)
-    }
+    return state
   }
 }
 
@@ -190,8 +294,9 @@ function applyConwayRules(board) {
         if (liveNeighborsCount === 3) {
           const durationMode = mode(neighbors.map(neighbor => neighbor.duration));
           const color = mode(neighbors.map(neighbor => neighbor.color))
+          const instrument = mode(neighbors.map(neighbor => neighbor.instrument));
 
-          return Tile({...tile, plant: true, age: PLANT_MATURITY_AGE, duration: durationMode, color})
+          return Tile({...tile, plant: true, age: PLANT_MATURITY_AGE, duration: durationMode, color, instrument})
         } else {
           return tile
         }
@@ -225,8 +330,11 @@ function applyMusicRules(state, noteDuration) {
 function applyNote(tile) {
   if (tile.plant && tile.age >= PLANT_MATURITY_AGE) {
     const register = Math.floor(tile.column / 8 + 2);
-    
-    return octave[tile.row % octave.length] + register.toString();
+
+    const note = octave[tile.row % octave.length] + register.toString();
+    const instrument = tile.instrument;
+
+    return {note, instrument}
   }
 }
 
@@ -239,21 +347,6 @@ function pulse(state) {
 }
 
 function liveNeighbors(board, tile) {
-  function positionIsOnBoard ({row, column}) {
-    const boardSize = board.length; // trololololo better hope the board is square
-
-    if (row < 0 || column < 0) {
-      return false;
-    }
-
-    if (row > boardSize - 1 || column > boardSize - 1) {
-      return false;
-    }
-
-    return true;
-  }
-
-
   const potentialNeighbors = [
     {column: -1, row: -1}, //NW
     {column: 0, row: -1},  //N
@@ -275,25 +368,38 @@ function liveNeighbors(board, tile) {
 }
 
 function tileAtPosition(board, position) {
-  let row = Math.round(position.y / 30)
-  let column = Math.round(position.x / 30)
+  let row = Math.round(position.y / PATCHSIZE)
+  let column = Math.round(position.x / PATCHSIZE)
 
-  return board[row][column]
+ if (positionIsOnBoard({row, column})) {
+   return board[row][column];
+ }
+
 }
 
 function plant(state) {
   const tile = tileAtPosition(state.board, state.gardener.position)
+    const currentSelectedPlant =  selectedPlant(state);
 
-  tile.plant = true
-  tile.age = 0
-  tile.duration = selectedPlant(state).duration
-  tile.color = selectedPlant(state).color
+  if (tile) {
+    tile.plant = true
+    tile.age = 0
+    tile.duration = currentSelectedPlant.duration
+    tile.color = currentSelectedPlant.color
+    tile.instrument = currentSelectedPlant.instrument
+  }
 
   return state
 }
 
 function selectedPlant(state) {
-  return state.nursery[state.selectedPlantIndex]
+  const selectedInstrument = state.nursery[state.selectedInstrumentIndex];
+  const plant = selectedInstrument.options[state.selectedPlantIndex]
+
+  return {
+    ...plant,
+    instrument: selectedInstrument.instrument
+  }
 }
 
 function previousNurseryPlant (state) {
@@ -308,8 +414,32 @@ function nextNurseryPlant (state) {
   return {
     ...state,
 
-    selectedPlantIndex: (state.selectedPlantIndex + 1) % nursery.length
+    selectedPlantIndex: (state.selectedPlantIndex + 1) % nursery[state.selectedInstrumentIndex].options.length
   }
+}
+
+function previousNurseryInstrument (state) {
+  const instrumentsCount = state.nursery.length;
+
+  return {
+    ...state,
+
+    selectedInstrumentIndex: state.selectedInstrumentIndex === 0 ? instrumentsCount - 1 : state.selectedInstrumentIndex - 1
+  };
+}
+
+function nextNurseryInstrument (state) {
+  return {
+    ...state,
+
+    selectedInstrumentIndex: (state.selectedInstrumentIndex + 1) % nursery.length
+  }
+}
+
+function incrementBeat (state) {
+  state.beat += 1;
+
+  return state;
 }
 
 function main({DOM, Keys, Animation}) {
@@ -340,9 +470,17 @@ function main({DOM, Keys, Animation}) {
   const update$ = Animation.pluck('delta')
     .withLatestFrom(keys$, (delta, keys) => update(delta/FRAMERATE, keys))
 
-  const tick$ = Observable.interval(50)
-    .shareReplay()
-  
+  const timescale$ = DOM
+    .select('.timescale')
+    .events('change')
+    .map(event => event.target.value)
+    .startWith(150);
+
+  const tick$ = timescale$.flatMapLatest(timescale => Observable.interval((MAX_TIMESCALE + MIN_TIMESCALE) - timescale))
+    .shareReplay(1)
+
+  const incrementBeat$ = tick$.map(event => incrementBeat);
+
   const pulse$ = tick$
     .filter((i) => i % 8 === 0)
     .map(event => pulse)
@@ -355,18 +493,34 @@ function main({DOM, Keys, Animation}) {
     .down('right')
     .map(event => nextNurseryPlant);
 
+  const previousNurseryInstrument$ = Keys
+    .down('up')
+    .map(event => previousNurseryInstrument);
+
+  const nextNurseryInstrument$ = Keys
+    .down('down')
+    .map(event => nextNurseryInstrument);
+
   const action$ = Observable.merge(
     update$,
     plant$,
     pulse$,
     previousNurseryPlant$,
-    nextNurseryPlant$
+    nextNurseryPlant$,
+    previousNurseryInstrument$,
+    nextNurseryInstrument$,
+    incrementBeat$
   )
 
   const initialState = {
+    beat: 0,
     board: Board({rows: BOARDSIZE, columns: BOARDSIZE}),
-    gardener: Gardener({position: {x: 200, y: 150}}),
+    gardener: Gardener({
+      position: {x: 200, y: 150},
+      velocity: {x:0, y: 0}
+    }),
     nursery,
+    selectedInstrumentIndex: 0,
     selectedPlantIndex: 0
   }
 
@@ -375,19 +529,21 @@ function main({DOM, Keys, Animation}) {
     .scan((state, action) => action(state))
     .shareReplay()
 
-  const wholeNotes$ = tick$
+  const beat$ = state$.pluck('beat').distinctUntilChanged().shareReplay();
+
+  const wholeNotes$ = beat$
     .filter((i) => i % 8 === 0)
     .withLatestFrom(state$, (__, state) => applyMusicRules(state, 1) )
 
-  const halfNotes$ = tick$
+  const halfNotes$ = beat$
     .filter((i) => i % 4 === 0)
     .withLatestFrom(state$, (__, state) => applyMusicRules(state, 2) )
 
-  const quarterNotes$ = tick$
+  const quarterNotes$ = beat$
     .filter((i) => i % 2 === 0)
     .withLatestFrom(state$, (__, state) => applyMusicRules(state, 4) )
 
-  const eightNotes$ = tick$
+  const eightNotes$ = beat$
     .withLatestFrom(state$, (__, state) => applyMusicRules(state, 8) )
 
   const notes$ = Observable.merge(
@@ -407,7 +563,16 @@ const drivers = {
   DOM: makeDOMDriver('.app'),
   Keys: makeKeysDriver(),
   Animation: makeAnimationDriver(),
-  Music: notes$ => notes$.subscribe(notes => synth.triggerAttackRelease(notes, "4n"))
+  Music: notes$ => notes$.subscribe(notes => {
+    const notesGroupedByInstrument = _.groupBy(notes, 'instrument');
+
+    for (let instrument in notesGroupedByInstrument) {
+      const notesToPlay = notesGroupedByInstrument[instrument]
+        .map(({note}) => note);
+
+      instruments[instrument].triggerAttackRelease(_.uniq(notesToPlay), '4n');
+    }
+  })
 }
 
 Cycle.run(main, drivers)
