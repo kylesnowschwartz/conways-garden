@@ -55,6 +55,18 @@ const nursery = [
   }
 ];
 
+const initialState = () => ({
+  beat: 0,
+  board: Board({rows: BOARDSIZE, columns: BOARDSIZE}),
+  gardener: Gardener({
+    position: {x: 200, y: 150},
+    velocity: {x: 0, y: 0}
+  }),
+  nursery,
+  selectedInstrumentIndex: 0,
+  selectedPlantIndex: 0
+})
+
 function Board({rows, columns}) {
   return (
     _.range(0, rows).map((row, rowIndex) =>
@@ -157,7 +169,9 @@ function view({board, gardener, nursery, selectedInstrumentIndex, selectedPlantI
       div('.timescale-container', [
         'Timescale: ',
         input('.timescale', {attributes: {type: 'range', min: MIN_TIMESCALE, max: MAX_TIMESCALE}}),
-      ])
+      ]),
+
+      button('.reset', 'Reset')
     ])
   )
 }
@@ -441,6 +455,10 @@ function incrementBeat (state) {
   return state;
 }
 
+function reset (state) {
+  return initialState();
+}
+
 function main({DOM, Keys, Animation}) {
   function isDown(key) {
     const down$ = Keys.down(key)
@@ -500,6 +518,11 @@ function main({DOM, Keys, Animation}) {
     .down('down')
     .map(event => nextNurseryInstrument);
 
+  const reset$ = DOM
+    .select('.reset')
+    .events('click')
+    .map(event => reset)
+
   const action$ = Observable.merge(
     update$,
     plant$,
@@ -508,23 +531,12 @@ function main({DOM, Keys, Animation}) {
     nextNurseryPlant$,
     previousNurseryInstrument$,
     nextNurseryInstrument$,
-    incrementBeat$
+    incrementBeat$,
+    reset$
   )
 
-  const initialState = {
-    beat: 0,
-    board: Board({rows: BOARDSIZE, columns: BOARDSIZE}),
-    gardener: Gardener({
-      position: {x: 200, y: 150},
-      velocity: {x: 0, y: 0}
-    }),
-    nursery,
-    selectedInstrumentIndex: 0,
-    selectedPlantIndex: 0
-  }
-
   const state$ = action$
-    .startWith(initialState)
+    .startWith(initialState())
     .scan((state, action) => action(state))
     .shareReplay()
 
