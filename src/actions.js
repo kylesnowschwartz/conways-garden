@@ -1,6 +1,8 @@
 // import {makeKeysDriver} from 'cycle-keys'
 import combineLatestObj from 'rx-combine-latest-obj'
 import {Observable} from 'rx'
+import _ from 'lodash';
+import {MAX_TIMESCALE, MIN_TIMESCALE, FRAMERATE} from './constants'
 
 export default function actions ({DOM, Keys, Animation}) {
   const keys$ = combineLatestObj({
@@ -37,7 +39,11 @@ export default function actions ({DOM, Keys, Animation}) {
     .map(event => ({type: 'PLANT'}))
 
   const updateAction$ = Animation.pluck('delta')
-    .withLatestFrom(keys$, (delta, keys) => ({type: 'UPDATE', delta: delta/FRAMERATE, keys}))
+    .withLatestFrom(keys$, (delta, keys) => {
+      return {
+        type: 'UPDATE', delta: delta/FRAMERATE, keys
+      }
+    });
 
   const incrementBeatAction$ = tick$.map(event => ({type: 'INCREMENT_BEAT'}));
 
@@ -66,7 +72,7 @@ export default function actions ({DOM, Keys, Animation}) {
     .events('click')
     .map(event => ({type: 'RESET'}))
 
-  return {
+  return Observable.merge(
     plantAction$,
     updateAction$,
     incrementBeatAction$,
@@ -76,5 +82,5 @@ export default function actions ({DOM, Keys, Animation}) {
     previousNurseryInstrumentAction$,
     nextNurseryInstrumentAction$,
     resetAction$
-  }
+  );
 }

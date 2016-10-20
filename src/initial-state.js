@@ -1,8 +1,8 @@
-import constants from './constants'
+import {BOARDSIZE} from './constants'
 import {Tile} from './helpers'
 import uuid from 'node-uuid'
+import _ from 'lodash';
 
-const { BOARDSIZE } = constants;
 
 const nursery = [
   {

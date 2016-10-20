@@ -1,8 +1,6 @@
-import constants from './constants'
+import {PATCHSIZE, PLANT_MATURITY_AGE, BOARDSIZE_IN_PX} from './constants'
 import {Tile, tileAtPosition, positionIsOnBoard} from './helpers'
 import initialState from './initial-state'
-
-const {PATCHSIZE, BOARDSIZE, FRAMERATE, PLANT_MATURITY_AGE} = constants;
 
 const reducers = {
   UPDATE (state, action) {
@@ -22,7 +20,7 @@ const reducers = {
 
   PLANT (state, action) {
     const tile = tileAtPosition(state.board, state.gardener.position)
-      const currentSelectedPlant =  selectedPlant(state, action);
+    const currentSelectedPlant =  selectedPlant(state, action);
 
     if (tile) {
       tile.plant = true
@@ -132,9 +130,9 @@ function calculatePosition(gardener, delta) {
 
   if (positionIsOnBoard({row, column})) {
     return {
-        x: xPosition,
-        y: yPosition
-      }
+      x: xPosition,
+      y: yPosition
+    }
   } else {
     let xWrapped = xPosition;
     let yWrapped = yPosition;

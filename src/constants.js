@@ -6,7 +6,7 @@ const PLANT_MATURITY_AGE = 3000 / FRAMERATE // msec
 const MAX_TIMESCALE = 250
 const MIN_TIMESCALE = 50
 
-const constants = {
+export {
   FRAMERATE,
   BOARDSIZE,
   PATCHSIZE,
@@ -15,5 +15,3 @@ const constants = {
   MAX_TIMESCALE,
   MIN_TIMESCALE
 }
-
-export default constants

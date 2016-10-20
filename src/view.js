@@ -1,8 +1,6 @@
 import {makeDOMDriver, div, button, input} from '@cycle/dom'
-import constants from './constants'
+import {PLANT_MATURITY_AGE, MIN_TIMESCALE, MAX_TIMESCALE} from './constants';
 import {tileAtPosition}  from './helpers'
-
-const {PATCHSIZE, BOARDSIZE, FRAMERATE, PLANT_MATURITY_AGE, MIN_TIMESCALE, MAX_TIMESCALE} = constants;
 
 function view({board, gardener, nursery, selectedInstrumentIndex, selectedPlantIndex, beat}) {
   const tileAtGardenerPosition = tileAtPosition(board, gardener.position)

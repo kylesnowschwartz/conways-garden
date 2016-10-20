@@ -8,12 +8,11 @@ import Tone from 'tone'
 
 import reducers from './src/reducers'
 import view from './src/view'
-import constants from './src/constants'
 import actions from './src/actions'
 import initialState from './src/initial-state'
 import {Tile, tileAtPosition, positionIsOnBoard} from './src/helpers'
 
-const {PATCHSIZE, BOARDSIZE, FRAMERATE, PLANT_MATURITY_AGE, MIN_TIMESCALE, MAX_TIMESCALE} = constants;
+import {PATCHSIZE, BOARDSIZE, FRAMERATE, PLANT_MATURITY_AGE, MIN_TIMESCALE, MAX_TIMESCALE} from './src/constants'
 
 const {plantAction$, updateAction$, incrementBeatAction$, pulseAction$, previousNurseryPlantAction$, nextNurseryPlantAction$, previousNurseryInstrumentAction$, nextNurseryInstrumentAction$, resetAction$} = actions;
 
@@ -51,9 +50,7 @@ function applyNote(tile) {
 }
 
 function main({DOM, Keys, Animation}) {
-  const action$ = Observable.merge(
-    actions({DOM, Keys, Animation})
-  )
+  const action$ = actions({DOM, Keys, Animation});
 
   const state$ = action$
     .startWith(initialState())
