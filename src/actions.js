@@ -1,8 +1,7 @@
 // import {makeKeysDriver} from 'cycle-keys'
-import combineLatestObj from 'rx-combine-latest-obj'
-import {Observable} from 'rx'
-import _ from 'lodash';
-import {MAX_TIMESCALE, MIN_TIMESCALE, FRAMERATE} from './constants'
+import combineLatestObj from 'rx-combine-latest-obj';
+import {Observable} from 'rx';
+import {MAX_TIMESCALE, MIN_TIMESCALE, FRAMERATE} from './constants';
 
 export default function actions ({DOM, Keys, Animation}) {
   const keys$ = combineLatestObj({
@@ -10,19 +9,19 @@ export default function actions ({DOM, Keys, Animation}) {
     A$: isDown('A'),
     S$: isDown('S'),
     D$: isDown('D')
-  })
+  });
 
-  function isDown(key) {
+  function isDown (key) {
     const down$ = Keys.down(key)
-      .map(event => true)
+      .map(event => true);
 
     const up$ = Keys.up(key)
-      .map(event => false)
+      .map(event => false);
 
     return Observable.merge(
       down$,
       up$
-    ).startWith(false)
+    ).startWith(false);
   }
 
   const timescale$ = DOM
@@ -32,24 +31,24 @@ export default function actions ({DOM, Keys, Animation}) {
     .startWith(150);
 
   const tick$ = timescale$.flatMapLatest(timescale => Observable.interval((MAX_TIMESCALE + MIN_TIMESCALE) - timescale))
-    .shareReplay(1)
+    .shareReplay(1);
 
   const plantAction$ = Keys.down('space')
     .do(event => event.preventDefault())
-    .map(event => ({type: 'PLANT'}))
+    .map(event => ({type: 'PLANT'}));
 
   const updateAction$ = Animation.pluck('delta')
     .withLatestFrom(keys$, (delta, keys) => {
       return {
-        type: 'UPDATE', delta: delta/FRAMERATE, keys
-      }
+        type: 'UPDATE', delta: delta / FRAMERATE, keys
+      };
     });
 
   const incrementBeatAction$ = tick$.map(event => ({type: 'INCREMENT_BEAT'}));
 
   const pulseAction$ = tick$
     .filter((i) => i % 8 === 0)
-    .map(event => ({type: 'PULSE'}))
+    .map(event => ({type: 'PULSE'}));
 
   const previousNurseryPlantAction$ = Keys
     .down('left')
@@ -70,7 +69,7 @@ export default function actions ({DOM, Keys, Animation}) {
   const resetAction$ = DOM
     .select('.reset')
     .events('click')
-    .map(event => ({type: 'RESET'}))
+    .map(event => ({type: 'RESET'}));
 
   return Observable.merge(
     plantAction$,

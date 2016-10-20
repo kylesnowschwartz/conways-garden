@@ -1,9 +1,9 @@
-import {makeDOMDriver, div, button, input} from '@cycle/dom'
+import {div, button, input} from '@cycle/dom';
 import {PLANT_MATURITY_AGE, MIN_TIMESCALE, MAX_TIMESCALE} from './constants';
-import {tileAtPosition}  from './helpers'
+import {tileAtPosition}  from './helpers';
 
-function view({board, gardener, nursery, selectedInstrumentIndex, selectedPlantIndex, beat}) {
-  const tileAtGardenerPosition = tileAtPosition(board, gardener.position)
+function view ({board, gardener, nursery, selectedInstrumentIndex, selectedPlantIndex, beat}) {
+  const tileAtGardenerPosition = tileAtPosition(board, gardener.position);
 
   return (
     div('.game', [
@@ -13,34 +13,33 @@ function view({board, gardener, nursery, selectedInstrumentIndex, selectedPlantI
 
       div('.timescale-container', [
         'Timescale: ',
-        input('.timescale', {attributes: {type: 'range', min: MIN_TIMESCALE, max: MAX_TIMESCALE}}),
+        input('.timescale', {attributes: {type: 'range', min: MIN_TIMESCALE, max: MAX_TIMESCALE}})
       ]),
 
       button('.reset', 'Reset')
     ])
-  )
+  );
 }
 
-function renderRow(row, tileAtGardenerPosition, beat) {
+function renderRow (row, tileAtGardenerPosition, beat) {
   return (
     div('.row', row.map(tile => renderTile(tile, tile === tileAtGardenerPosition, beat)))
-  )
+  );
 }
 
-function renderTile(tile, tileAtGardenerPosition, beat) {
-  let classes = `.tile ${tile.plant ? '.plant' : '' } ${tileAtGardenerPosition ? '.outline' : '' }`
+function renderTile (tile, tileAtGardenerPosition, beat) {
+  let classes = `.tile ${tile.plant ? '.plant' : ''} ${tileAtGardenerPosition ? '.outline' : ''}`;
 
   const style = {
     background: tile.color
-  }
+  };
 
   const mature = tile.age > PLANT_MATURITY_AGE;
 
   if (tile.plant && !mature) {
     const borderThickness = 14 - (14 * tile.age / PLANT_MATURITY_AGE);
 
-    style.border = `${borderThickness}px solid black`
-
+    style.border = `${borderThickness}px solid black`;
   }
 
   if (tile.plant && mature) {
@@ -52,10 +51,10 @@ function renderTile(tile, tileAtGardenerPosition, beat) {
 
   return (
     div(classes, {key: tile.id, style})
-  )
+  );
 }
 
-function renderNurseryRow(nurseryRow, selectedInstrument, selectedPlantIndex) {
+function renderNurseryRow (nurseryRow, selectedInstrument, selectedPlantIndex) {
   return (
     div('.nursery-row', [
       nurseryRow.plantName,
@@ -67,15 +66,15 @@ function renderNurseryRow(nurseryRow, selectedInstrument, selectedPlantIndex) {
             `1/${plant.duration}`
            )
         )
-      ]
+    ]
     )
-  )
+  );
 }
 
-function renderNursery(nursery, selectedInstrumentIndex, selectedPlantIndex) {
+function renderNursery (nursery, selectedInstrumentIndex, selectedPlantIndex) {
   return (
     div('.nursery', nursery.map((row, index) => renderNurseryRow(row, selectedInstrumentIndex === index, selectedPlantIndex)))
-  )
+  );
 }
 
 export default view;

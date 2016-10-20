@@ -1,8 +1,7 @@
-import {BOARDSIZE} from './constants'
-import {Tile} from './helpers'
-import uuid from 'node-uuid'
+import {BOARDSIZE} from './constants';
+import {Tile} from './helpers';
+import uuid from 'node-uuid';
 import _ from 'lodash';
-
 
 const nursery = [
   {
@@ -38,9 +37,9 @@ const initialState = () => ({
   nursery,
   selectedInstrumentIndex: 0,
   selectedPlantIndex: 0
-})
+});
 
-function Board({rows, columns}) {
+function Board ({rows, columns}) {
   return (
     _.range(0, rows).map((row, rowIndex) =>
       _.range(0, columns).map((column, columnIndex) => Tile({
@@ -48,17 +47,17 @@ function Board({rows, columns}) {
         column: columnIndex
       }))
     )
-  )
+  );
 }
 
-function Gardener({position, velocity, id = uuid.v4()}) {
+function Gardener ({position, velocity, id = uuid.v4()}) {
   return {
     velocity,
     acceleration: 0.4,
     friction: 0.94,
     position,
     id
-  }
+  };
 }
 
-export default initialState
+export default initialState;
