@@ -1,7 +1,8 @@
-const PATCHSIZE = 30 //px
-const BOARDSIZE = 20
-const FRAMERATE = 1000 / 60
-const PLANT_MATURITY_AGE = 3000 / FRAMERATE // msec
+import constants from './constants'
+import {Tile, tileAtPosition, positionIsOnBoard} from './helpers'
+import initialState from './initial-state'
+
+const {PATCHSIZE, BOARDSIZE, FRAMERATE, PLANT_MATURITY_AGE} = constants;
 
 const reducers = {
   UPDATE (state, action) {
@@ -21,7 +22,7 @@ const reducers = {
 
   PLANT (state, action) {
     const tile = tileAtPosition(state.board, state.gardener.position)
-      const currentSelectedPlant =  selectedPlant(state, action);
+    const currentSelectedPlant = selectedPlant(state, action);
 
     if (tile) {
       tile.plant = true
@@ -46,7 +47,7 @@ const reducers = {
     return {
       ...state,
 
-      selectedPlantIndex: (state.selectedPlantIndex + 1) % nursery[state.selectedInstrumentIndex].options.length
+      selectedPlantIndex: (state.selectedPlantIndex + 1) % state.nursery[state.selectedInstrumentIndex].options.length
     }
   },
 
@@ -64,7 +65,7 @@ const reducers = {
     return {
       ...state,
 
-      selectedInstrumentIndex: (state.selectedInstrumentIndex + 1) % nursery.length
+      selectedInstrumentIndex: (state.selectedInstrumentIndex + 1) % state.nursery.length
     }
   },
 
@@ -90,7 +91,6 @@ function updateBoard(board, delta) {
     })
   )
 }
-
 
 function updateGardener(gardener, delta, keysDown) {
   const acceleration = gardener.acceleration * delta
@@ -162,18 +162,6 @@ function calculatePosition(gardener, delta) {
   }
 }
 
-function positionIsOnBoard ({row, column}) {
-  if (row < 0 || column < 0) {
-    return false;
-  }
-
-  if (row > BOARDSIZE - 1 || column > BOARDSIZE - 1) {
-    return false;
-  }
-
-  return true;
-}
-
 function calculateVelocity(gardener, delta, accelerationChange) {
   const xVelocity = (gardener.velocity.x + accelerationChange.x * delta) * (gardener.friction / delta);
   const yVelocity = (gardener.velocity.y + accelerationChange.y * delta) * (gardener.friction / delta);
@@ -238,15 +226,6 @@ function liveNeighbors(board, tile) {
     .filter(neighbor => neighbor.plant)
 }
 
-function tileAtPosition (board, position) {
-  let row = Math.round(position.y / PATCHSIZE)
-  let column = Math.round(position.x / PATCHSIZE)
-
- if (positionIsOnBoard({row, column})) {
-   return board[row][column];
- }
-}
-
 function selectedPlant (state) {
   const selectedInstrument = state.nursery[state.selectedInstrumentIndex];
   const plant = selectedInstrument.options[state.selectedPlantIndex]
@@ -263,10 +242,6 @@ function mode(arr){
       arr.filter(v => v===a).length
     - arr.filter(v => v===b).length
   ).pop();
-}
-
-function Tile({row, column, plant = false, age = 0, duration = 1, id = uuid.v4(), color = 'black', instrument = 'synth'}) {
-  return {row, column, plant, duration, age, id, color, instrument}
 }
 
 export default reducers;
