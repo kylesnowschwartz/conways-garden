@@ -2,7 +2,7 @@ import {div, button, input} from '@cycle/dom';
 import {PLANT_MATURITY_AGE, MIN_TIMESCALE, MAX_TIMESCALE} from './constants';
 import {tileAtPosition}  from './helpers';
 
-function view ({board, gardener, nursery, selectedInstrumentIndex, selectedPlantIndex, beat}) {
+function view ({board, gardener, nursery, selectedInstrumentIndex, selectedPlantIndex, beat, keySelection, selectedKeyIndex}) {
   const tileAtGardenerPosition = tileAtPosition(board, gardener.position);
 
   return (
@@ -10,6 +10,8 @@ function view ({board, gardener, nursery, selectedInstrumentIndex, selectedPlant
       div('.board', board.map(row => renderRow(row, tileAtGardenerPosition, beat))),
 
       renderNursery(nursery, selectedInstrumentIndex, selectedPlantIndex),
+      
+      renderKeySelection(keySelection, selectedKeyIndex),
 
       div('.timescale-container', [
         'Timescale: ',
@@ -71,9 +73,32 @@ function renderNurseryRow (nurseryRow, selectedInstrument, selectedPlantIndex) {
   );
 }
 
+function renderKeySelectionRow (keySelection, selectedKeyIndex) {
+  return (
+    div('.key-selection-row', [
+      'Key',
+
+      keySelection.options.map((key, index) =>
+        div(
+          `.nursery-slot ${index === selectedKeyIndex ? '.selected' : ''}`,
+          {style: {background: key.color}},
+          `${key.key}`
+        )
+      )
+    ]
+    )
+  );
+}
+
 function renderNursery (nursery, selectedInstrumentIndex, selectedPlantIndex) {
   return (
     div('.nursery', nursery.map((row, index) => renderNurseryRow(row, selectedInstrumentIndex === index, selectedPlantIndex)))
+  );
+}
+
+function renderKeySelection (keySelection, selectedKeyIndex) {
+  return (
+    div('.nursery', keySelection.map((row, index) => renderKeySelectionRow(row, selectedKeyIndex === index, selectedKeyIndex)))
   );
 }
 

@@ -27,6 +27,15 @@ const nursery = [
   }
 ];
 
+const keySelection = [
+  {
+    options: [
+      {key: 'G B D F#'.split(' '), color: '#AD1457'},
+      {key: 'C A B F'.split(' '), color: '#D81B60'}
+    ]
+  }
+];
+
 const initialState = () => ({
   beat: 0,
   board: Board({rows: BOARDSIZE, columns: BOARDSIZE}),
@@ -36,7 +45,9 @@ const initialState = () => ({
   }),
   nursery,
   selectedInstrumentIndex: 0,
-  selectedPlantIndex: 0
+  selectedPlantIndex: 0,
+  keySelection,
+  selectedKeyIndex: 0
 });
 
 function Board ({rows, columns}) {

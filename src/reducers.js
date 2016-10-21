@@ -67,6 +67,22 @@ const reducers = {
     };
   },
 
+  NEXT_KEY (state, action) {
+    return {
+      ...state,
+
+      selectedKeyIndex: (state.selectedKeyIndex + 1) % state.keySelection[0].options.length
+    }
+  },
+
+  PREVIOUS_KEY (state, action) {
+    return {
+      ...state,
+
+      selectedKeyIndex: state.selectedKeyIndex === 0 ? 3 : state.selectedKeyIndex - 1
+    }
+  },
+
   INCREMENT_BEAT (state, action) {
     state.beat += 1;
 

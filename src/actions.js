@@ -66,6 +66,14 @@ export default function actions ({DOM, Keys, Animation}) {
     .down('down')
     .map(event => ({type: 'NEXT_NURSERY_INSTRUMENT'}));
 
+  const nextKeyAction$ = Keys
+    .down('down')
+    .map(event => ({type: 'NEXT_KEY'}));
+
+  const previousKeyAction$ = Keys
+    .down('up')
+    .map(event => ({type: 'PREVIOUS_KEY'}));
+
   const resetAction$ = DOM
     .select('.reset')
     .events('click')
@@ -80,6 +88,8 @@ export default function actions ({DOM, Keys, Animation}) {
     nextNurseryPlantAction$,
     previousNurseryInstrumentAction$,
     nextNurseryInstrumentAction$,
-    resetAction$
+    resetAction$,
+    nextKeyAction$,
+    previousKeyAction$
   );
 }
