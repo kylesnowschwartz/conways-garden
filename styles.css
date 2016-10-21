@@ -18,6 +18,7 @@ body {
 .game {
   box-sizing: border-box;
   width: 600px;
+  margin: 30px;
 }
 
 .board {
@@ -41,7 +42,7 @@ body {
 }
 
 .plant {
-  background: forestgreen;
+  border-radius: 50%;
 }
 
 .gardener {
