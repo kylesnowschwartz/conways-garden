@@ -13,7 +13,8 @@ import initialState from './src/initial-state';
 
 import {BOARDSIZE, PLANT_MATURITY_AGE} from './src/constants';
 
-const octave = 'G A C D E G'.split(' ');
+// const octave = 'G A C D E G'.split(' ');
+const octave = 'G B D F#'.split(' ');
 const synth = new Tone.PolySynth(BOARDSIZE, Tone.SimpleFM).toMaster();
 synth.set('volume', -10);
 
