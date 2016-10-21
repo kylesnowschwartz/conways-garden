@@ -34,10 +34,12 @@ const reducers = {
   },
 
   PREVIOUS_NURSERY_PLANT (state, action) {
+    const optionsCount = state.nursery[state.selectedInstrumentIndex].options.length
+
     return {
       ...state,
 
-      selectedPlantIndex: state.selectedPlantIndex === 0 ? 3 : state.selectedPlantIndex - 1
+      selectedPlantIndex: state.selectedPlantIndex === 0 ? optionsCount - 1 : state.selectedPlantIndex - 1
     };
   },
 
